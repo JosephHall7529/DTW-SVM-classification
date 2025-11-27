@@ -76,7 +76,14 @@ function profiles(data::data2D, tok, shot::Int64, feat::String)
     end 
 end
 
+
 # profile data
+function id(ts::Tuple{String, Int})
+    id = String((@subset id_codes_2D @byrow begin 
+        :TOK == ts[1]
+        in(:SHOT, ts[2])
+    end).id[1])
+end
 function id!(data::data2D)
     for row in eachrow(id_codes_2D)
         tok = row.TOK

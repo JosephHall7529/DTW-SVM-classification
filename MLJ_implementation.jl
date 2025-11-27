@@ -269,7 +269,6 @@ function MLJBase.fit(model::DTW_SVM, verbosity::Int, X, y)
     X = MLJBase.matrix(K)
     y = [y[i] for i in model.database.training_data.metadata.order]
     fitresult = svmtrain(X, y, kernel=Kernel.Precomputed, cost=model.C_cost)
-    # println("# of SV's: ", fitresult.SVs.nSV)
 
     report = dtw_svm_report(fitresult)
     # report = nothing

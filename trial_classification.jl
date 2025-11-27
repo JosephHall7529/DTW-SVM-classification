@@ -124,6 +124,7 @@ begin
     end
 end
 
+import MLJParticleSwarmOptimization
 struct classification_performance
     features::Vector{String}
     trial::Symbol
@@ -132,10 +133,20 @@ struct classification_performance
     test_results::DataFrame
 end
 
-trial_1_results = Dict()
-for para in collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"], 1, 1))
+# trial_1_results = Dict()
+# for para in collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"], 1, 1))
+    para = ["IP", "PNBI"]
+    if in(naming(para), keys(trial_1_results))
+        println(para)
+        continue
+    end
     labelled = (@subset trials_D @byrow :trial_1 == 1)
     unseen = (@subset trials_D @byrow :trial_1 !== 1)
+
+    if in("NGW", para)
+        rm_ind = findfirst(i -> i == ("aug", 29624), unseen.shots)
+        deleteat!(unseen, rm_ind)
+    end
 
     model_tmp = half_model(para, labelled.shots, labelled.label;
                     target_shot_length=100,
@@ -165,16 +176,12 @@ for para in collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", 
                 resampling=StratifiedCV(nfolds=5, shuffle=true),
                 range=[r2, r3, r4],
                 measure=MulticlassFalsePositiveRate(levels=["LH", "EH", "CO"], perm=[3,2,1]),
-                n=30,
+                n=10,
                 check_measure=true
         )
 
         mach = machine(self_tuning_tree, labelled.shots, labelled.label) 
-        try 
-            MLJBase.fit!(mach, verbosity=1)
-        catch 
-            continue
-        end
+        MLJBase.fit!(mach, verbosity=1)
     end
 
     train_eva = begin
@@ -193,7 +200,7 @@ for para in collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", 
 
     test_result = DataFrame([mcFPR BA A], [:mcFPR, :BA, :ACC])
     trial_1_results[naming(para)] = classification_performance(para, :trial_1, fitted_params(mach).best_model, train_result, test_result) 
-end
+# end
 
 fitted_params(mach).best_model
 let 
