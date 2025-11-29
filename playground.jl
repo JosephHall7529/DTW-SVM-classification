@@ -37,7 +37,6 @@ for i in 1:size(res, 1)
 end
 p
 # CSV.write("/Users/joe/Project/Coding_clean/J_Hybrid_plasma_classification_25_02_24/data/play.csv", p)
-.
 
 
 
