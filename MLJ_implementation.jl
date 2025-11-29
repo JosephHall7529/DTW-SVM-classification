@@ -91,11 +91,10 @@ function fill_dtw_data!(data_::DTW_data, target_length::Int)
     ℓf = length(data_.features)
     LSD = least_data_length(data_)
 
-    profile_data = Dict{Tuple, Array{Float64}}()
-    flat_top_data = Dict{Tuple, Array{Float64}}()
+    profile_data = Dict{Tuple, Array}()
+    flat_top_data = Dict{Tuple, Array}()
 
     for (i, ts) in enumerate(data_.tok_shots)
-        Random.seed!(i)
         mat_ip = Float64[]
         mat_nbi = Float64[]
         IP_step_constraint = LSD[ts]["IP"] 
@@ -115,6 +114,7 @@ function fill_dtw_data!(data_::DTW_data, target_length::Int)
         end
         constraint_step_IP = div(length(constraint_time_IP), IP_step_constraint.length)
         constraint_time_IP = constraint_time_IP[1:constraint_step_IP:end] 
+
         constraint_feature_NBI = profiles(ts..., NBI_step_constraint[1]).t
         constraint_time_NBI = constraint_feature_NBI[FTNBI[ts][1] .< constraint_feature_NBI .< FTNBI[ts][2]]
         constraint_step_NBI = div(length(constraint_time_NBI), NBI_step_constraint.length)
@@ -132,7 +132,7 @@ function fill_dtw_data!(data_::DTW_data, target_length::Int)
                 end
             end
             append!(mat_ip, abs.(P.y[ind, 1].*normalise_2D_features[feat]))
-
+    
             ind = Vector{Int}()
             for t in constraint_time_NBI
                 ind_last = findlast(i -> i <= t, P.t)
@@ -148,9 +148,10 @@ function fill_dtw_data!(data_::DTW_data, target_length::Int)
                 append!(mat_ip, constraint_time_IP) 
                 append!(mat_nbi, constraint_time_NBI)
             end
+            
         end
             
-        profile_data[ts] = reshape(mat_ip, :, ℓf+1)'
+        profile_data[ts] = reshape(mat_ip, :, ℓf+1)' 
         flat_top_data[ts] = reshape(mat_nbi, :, ℓf+1)'
     end
     data_.profile_data = profile_data
@@ -159,33 +160,33 @@ function fill_dtw_data!(data_::DTW_data, target_length::Int)
     return data_
 end
 
-function model_fill_train!(model::DTW_SVM, X, y)
+function model_fill_train!(model_::DTW_SVM, X, y)
     ℓT = length(X) #cost matrices are equal height and width of size ℓT
-    indices = [model.database.shot_ind_dict[ts] for ts in X]
+    indices = [model_.database.shot_ind_dict[ts] for ts in X]
     @assert length(indices) == ℓT "One of the training shots cannot be located in the dictionary shot -> ind"
 
     cosine_cost = zeros(ℓT, ℓT)
     flat_top_cost = zeros(ℓT, ℓT)
     
     # find indices of training data, initialise a dataframe with the metadata for training
-    metadata = DataFrame(:order => 1:ℓT, :ind => indices, :tok_shots => X, :y => y)
-    sort!(metadata, [:y, :tok_shots], rev=[true, false])
+    metadata = DataFrame(:order => 1:ℓT, :ind => indices, :shots => X, :label => y)
+    sort!(metadata, [:label, :shots], rev=[true, false])
 
     path_cos_ℓ = zeros(ℓT, ℓT)
     path_ft_ℓ = zeros(ℓT, ℓT)
-    for (i, train_ts_i) in ProgressBar(enumerate(metadata.tok_shots))
-        for (j, train_ts_j) in ProgressBar(enumerate(metadata.tok_shots))
-            data_j = model.database.profile_data[train_ts_j]
-            data_i = model.database.profile_data[train_ts_i]
+    for (i, train_ts_i) in ProgressBar(enumerate(metadata.shots))
+        for (j, train_ts_j) in enumerate(metadata.shots)
+            data_j = model_.database.profile_data[train_ts_j]
+            data_i = model_.database.profile_data[train_ts_i]
 
-            COST_cos, path_cos_a, path_cos_b  = dtw(data_j, data_i, CosineDist(); transportcost=model.transportcost)
+            COST_cos, path_cos_a, path_cos_b  = dtw(data_j, data_i, CosineDist(); transportcost=model_.transportcost)
             cosine_cost[i, j] = COST_cos
             path_cos_ℓ[i, j] = length(path_cos_a)
 
-            data_j = model.database.flat_top_data[train_ts_j]
-            data_i = model.database.flat_top_data[train_ts_i]
+            data_j = model_.database.flat_top_data[train_ts_j]
+            data_i = model_.database.flat_top_data[train_ts_i]
         
-            COST_ft, path_ft_a, path_ft_b = dtw(data_j, data_i, Euclidean(); transportcost=model.transportcost)
+            COST_ft, path_ft_a, path_ft_b = dtw(data_j, data_i, Euclidean(); transportcost=model_.transportcost)
             flat_top_cost[i, j] = COST_ft
             path_ft_ℓ[i, j] = length(path_ft_a)
         end
@@ -194,45 +195,45 @@ function model_fill_train!(model::DTW_SVM, X, y)
     cosine_cost = round.(cosine_cost ./ path_cos_ℓ, sigdigits=5)
     flat_top_cost = round.(flat_top_cost ./ path_ft_ℓ, sigdigits=5) 
     
-    df_names = df_ts_naming(metadata.tok_shots)
+    df_names = df_ts_naming(metadata.shots)
 
     cosine_cost = DataFrame(cosine_cost[:, :], df_names)
     flat_top_cost = DataFrame(flat_top_cost[:, :], df_names) 
 
-    insertcols!(cosine_cost, 1, :shots => metadata.tok_shots) 
-    insertcols!(flat_top_cost, 1, :shots => metadata.tok_shots)
+    insertcols!(cosine_cost, 1, :shots => metadata.shots) 
+    insertcols!(flat_top_cost, 1, :shots => metadata.shots)
 
-    model.database.training_data = DTW_train_result(metadata, cosine_cost, flat_top_cost)
-    return model.database
+    model_.database.training_data = DTW_train_result(metadata, cosine_cost, flat_top_cost)
+    return model_.database
 end
-function model_fill_test!(model::DTW_SVM, X)
-    training = model.database.training_data
+function model_fill_test!(model_::DTW_SVM, X)
+    training = model_.database.training_data
     ℓtr = size(training.metadata, 1)
     ℓT = length(X) #cost matrices are equal height and width of size ℓT
-    indices = [model.database.shot_ind_dict[ts] for ts in X]
+    indices = [model_.database.shot_ind_dict[ts] for ts in X]
     @assert length(indices) == ℓT "One of the training shots cannot be located in the dictionary shot -> ind"
 
     cosine_cost = zeros(ℓtr, ℓT)
     flat_top_cost = zeros(ℓtr, ℓT)
     
     # find indices of training data, initialise a dataframe with the metadata for training 
-    metadata = DataFrame(:order => 1:ℓT, :ind => indices, :tok_shots => X)
+    metadata = DataFrame(:order => 1:ℓT, :ind => indices, :shots => X)
 
     path_cos_ℓ = zeros(ℓtr, ℓT) 
     path_ft_ℓ = zeros(ℓtr, ℓT) 
-    for (i, train_ts) in ProgressBar(enumerate(training.metadata.tok_shots))
-        for (j, test_ts) in enumerate(metadata.tok_shots)
-            data_j = model.database.profile_data[test_ts]
-            data_i = model.database.profile_data[train_ts]
+    for (i, train_ts) in ProgressBar(enumerate(training.metadata.shots))
+        for (j, test_ts) in enumerate(metadata.shots)
+            data_j = model_.database.profile_data[test_ts]
+            data_i = model_.database.profile_data[train_ts]
 
-            COST_cos, path_cos_a, path_cos_b  = dtw(data_j, data_i, CosineDist(); transportcost=model.transportcost)
+            COST_cos, path_cos_a, path_cos_b  = dtw(data_j, data_i, CosineDist(); transportcost=model_.transportcost)
             cosine_cost[i, j] = COST_cos
             path_cos_ℓ[i, j] = length(path_cos_a)
             
-            data_j = model.database.flat_top_data[test_ts]
-            data_i = model.database.flat_top_data[train_ts]
+            data_j = model_.database.flat_top_data[test_ts]
+            data_i = model_.database.flat_top_data[train_ts]
 
-            COST_ft, path_ft_a, path_ft_b = dtw(data_j, data_i, Euclidean(); transportcost=model.transportcost)
+            COST_ft, path_ft_a, path_ft_b = dtw(data_j, data_i, Euclidean(); transportcost=model_.transportcost)
             flat_top_cost[i, j] = COST_ft
             path_ft_ℓ[i, j] = length(path_ft_a)
         end
@@ -241,34 +242,37 @@ function model_fill_test!(model::DTW_SVM, X)
     cosine_cost = round.(cosine_cost ./ path_cos_ℓ, sigdigits=5)
     flat_top_cost = round.(flat_top_cost ./ path_ft_ℓ, sigdigits=5) 
     
-    df_names = df_ts_naming(metadata.tok_shots)
+    df_names = df_ts_naming(metadata.shots)
 
     cosine_cost = DataFrame(cosine_cost[:, :], df_names)
     flat_top_cost = DataFrame(flat_top_cost[:, :], df_names) 
 
-    insertcols!(cosine_cost, 1, :train => training.metadata.tok_shots) 
-    insertcols!(flat_top_cost, 1, :train => training.metadata.tok_shots)
+    insertcols!(cosine_cost, 1, :train => training.metadata.shots) 
+    insertcols!(flat_top_cost, 1, :train => training.metadata.shots)
 
-    model.database.testing_data = DTW_test_result(metadata, cosine_cost, flat_top_cost)
-    return model
+    model_.database.testing_data = DTW_test_result(metadata, cosine_cost, flat_top_cost)
+    return model_
 end
 
 dtw_svm_report(fitresult) = (SVs = fitresult.SVs.nSV)
 
-function MLJBase.fit(model::DTW_SVM, verbosity::Int, X, y) 
-    if model.database.target_shot_length !== model.target_shot_length
-        fill_dtw_data!(model.database, model.target_shot_length)
+function MLJBase.fit(model_::DTW_SVM, verbosity::Int, X, y)
+    if model_.database.target_shot_length !== model_.target_shot_length
+        fill_dtw_data!(model_.database, model_.target_shot_length)
     end
-    model_fill_train!(model, X, y)
-    Xmatrix = (ftX = Array(model.database.training_data.flat_top_cost[!, 2:end]),
-                cosX = Array(model.database.training_data.cosine_cost[!, 2:end]))
+    model_fill_train!(model_, X, y)
 
-    K = exp.(-(Xmatrix.cosX ./ (model.C_cosine)).^2) .*
-        exp.(-(Xmatrix.ftX ./ (model.C_flat_top)).^2)
+    # organise the train kernel
+    train_names = df_ts_naming(X)
+    ind = sortperm(model_.database.training_data.metadata, :order)
+    Xmatrix = (ftX = Array(model_.database.training_data.flat_top_cost[ind, train_names]),
+                cosX = Array(model_.database.training_data.cosine_cost[ind, train_names]))
+
+    K = exp.(-(Xmatrix.cosX ./ (model_.C_cosine)).^2) .*
+        exp.(-(Xmatrix.ftX ./ (model_.C_flat_top)).^2)
 
     X = MLJBase.matrix(K)
-    y = [y[i] for i in model.database.training_data.metadata.order]
-    fitresult = svmtrain(X, y, kernel=Kernel.Precomputed, cost=model.C_cost)
+    fitresult = svmtrain(X, y, kernel=Kernel.Precomputed, cost=model_.C_cost)
 
     report = dtw_svm_report(fitresult)
     # report = nothing
@@ -282,21 +286,24 @@ function MLJBase.predict(model_::DTW_SVM, fitresult, Xnew)
         fill_dtw_data!(model_.database, model_.target_shot_length)
     end
     model_fill_test!(model_, Xnew)
-    test_data = model_.database.testing_data.metadata
+    test_data = model_.database.testing_data
 
-    Xmatrix = (ftX = Array(model_.database.testing_data.flat_top_cost[!, 2:end]), 
-                cosX = Array(model_.database.testing_data.cosine_cost[!, 2:end]))
+    test_names = df_ts_naming(Xnew)
+    ind = sortperm(model_.database.training_data.metadata, :order)
 
-    println(size(Xmatrix.ftX))
+    Xmatrix = (ftX = Array(test_data.flat_top_cost[ind, test_names]), 
+                cosX = Array(test_data.cosine_cost[ind, test_names]))
+
+    # println(size(Xmatrix.ftX))
     K = exp.(-(Xmatrix.cosX ./ (model_.C_cosine)).^2) .* 
         exp.(-(Xmatrix.ftX ./ (model_.C_flat_top)).^2) 
 
     X = MLJBase.matrix(K)
     ỹ, confidence = svmpredict(fitresult, X)
-    test_data.y = [ỹ[i] for i in test_data.order]
-    test_data.confidence = [confidence[:, i] for i in test_data.order]
+    test_data.metadata.y = ỹ
+    test_data.metadata.confidence = [confidence[:, i] for i in 1:length(Xnew)]
 
-    sort!(test_data, [:y, :tok_shots], rev=[true, false])
+    sort!(test_data.metadata, [:y, :shots], rev=[true, false])
 
     return ỹ
 end
@@ -309,34 +316,34 @@ function half_model(features::Vector{String}, X, y;
                 C_cost=1.0,
                 short_IP=false,
                 kernel::Bool=false)
-    model = DTW_SVM(features;
+    model_ = DTW_SVM(features;
                 target_shot_length=target_shot_length,
                 transportcost=transportcost,
                 C_cosine=C_cosine,
                 C_flat_top=C_flat_top,
                 C_cost=C_cost,
                 short_IP=short_IP)
-    fill_dtw_data!(model.database, target_shot_length)
-    model_fill_train!(model, X, y)
+    fill_dtw_data!(model_.database, target_shot_length)
+    model_fill_train!(model_, X, y)
 
     if kernel
-        Xmatrix = (ftX = Array(model.database.training_data.flat_top_cost[! , 2:end]),
-                cosX = Array(model.database.training_data.cosine_cost[!, 2:end]))
+        Xmatrix = (ftX = Array(model_.database.training_data.flat_top_cost[! , 2:end]),
+                cosX = Array(model_.database.training_data.cosine_cost[!, 2:end]))
 
-        K = exp.(-(Xmatrix.cosX ./ (model.C_cosine)).^2) .*
-            exp.(-(Xmatrix.ftX ./ (model.C_flat_top)).^2)
+        K = exp.(-(Xmatrix.cosX ./ (model_.C_cosine)).^2) .*
+            exp.(-(Xmatrix.ftX ./ (model_.C_flat_top)).^2)
 
-        return K, model
+        return K, model_
     end
-    return model
+    return model_
 end
 function C_extremes(features::Vector{String}, target_length::Int, X, y)
     
     ℓ = length(X)
 
-    model = half_model(features, target_length, X, y)
-    CC = Array(model.database.training_data.cosine_cost[:, 2:end])
-    FT = Array(model.database.training_data.flat_top_cost[:, 2:end])
+    model_ = half_model(features, target_length, X, y)
+    CC = Array(model_.database.training_data.cosine_cost[:, 2:end])
+    FT = Array(model_.database.training_data.flat_top_cost[:, 2:end])
 
     results = Dict()
     for (df, name) in zip([CC, FT], ["cosine_cost", "flat_top_cost"])
@@ -344,9 +351,9 @@ function C_extremes(features::Vector{String}, target_length::Int, X, y)
     end
     return results
 end
-function C_extremes(model::DTW_SVM)
-    CC = Array(model.database.training_data.cosine_cost[:, 2:end])
-    FT = Array(model.database.training_data.flat_top_cost[:, 2:end])
+function C_extremes(model_::DTW_SVM)
+    CC = Array(model_.database.training_data.cosine_cost[:, 2:end])
+    FT = Array(model_.database.training_data.flat_top_cost[:, 2:end])
 
     ℓ = size(CC, 1)
 
@@ -356,3 +363,49 @@ function C_extremes(model::DTW_SVM)
     end
     return results
 end
+
+y=[1,1,1]
+ỹ = [2,1,3]
+map([BalancedAccuracy(), Accuracy])
+
+import MLJBase.evaluate
+function evaluate(model_::DTW_SVM, measures; N::Int=1000)
+    Results = DataFrame()
+    
+    model_train = deepcopy(model_.database.training_data)
+    ℓ_data = size(model_train.metadata, 1)
+
+    K = exp.(-(Array(model_train.cosine_cost[:, 2:end]) ./ (hyp_new.C_cosine)).^2) .* 
+                exp.(-(Array(model_train.flat_top_cost[:, 2:end]) ./ (hyp_new.C_flat_top)).^2)
+    for S in 0:N
+        begin
+            train_ind, test_ind = partition(1:ℓ_data, 0.7, rng=S, stratify=model_train.metadata.label)
+            sort!(train_ind)
+            sort!(test_ind)
+
+            model = svmtrain(K[train_ind, train_ind], model_train.metadata.label[train_ind], kernel=Kernel.Precomputed, cost=hyp_new.C_cost)
+
+            ỹ, _ = svmpredict(model, K[train_ind, test_ind])
+            y = model_train.metadata.label[test_ind]
+
+            y_preds = map(measures) do m
+                round.(m(ỹ, y), digits=3)
+            end
+
+            # println("accuracy = $(acc), balanced accuracy = $(b_acc), false positive rate = $(fpr)")
+
+            SVL, SVE, SVO = model.SVs.nSV
+            # println(SVL, ", $(SVE), $(SVO)")
+            cnt_map = countmap(ỹ)
+            no_CO = haskey(cnt_map, "CO") ? cnt_map["CO"] : 0
+            no_EH = haskey(cnt_map, "EH") ? cnt_map["EH"] : 0
+            no_LH = haskey(cnt_map, "LH") ? cnt_map["LH"] : 0
+
+            int = OrderedDict("rng" => S, (["$measure" for measure in measures] .=> y_preds)...,
+                "#SV LH" => SVL, "#SV EH" => SVE, "#SV CO" => SVO,
+                "#LH" => no_LH, "#EH" => no_EH, "#CO" => no_CO)
+            append!(Results, DataFrame(int))
+        end
+    end
+    return Results
+end 
