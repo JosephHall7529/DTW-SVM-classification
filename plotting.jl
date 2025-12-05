@@ -50,22 +50,19 @@ function plot_1D_features(ts::Tuple{String, Number}, feat::String; kwargs...)
 end
 function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}; kwargs...)
     ℓ = length(feats)
-    layout, □ = plot_layout(ℓ)
 
     P = [profiles(ts..., feat) for feat in feats]  
     Y = [abs.(P[n].y.y.*normalise_2D_features[feat]) for (n, feat) in enumerate(feats)]
 
-    fig = Figure(size=□);
+    fig = Figure();
+    ax = Axis(fig[1, 1]);
 
-    axes = []
-    for (k, sub_) in enumerate(layout)
-        ax = Axis(fig[sub_...]; kwargs...)
-        lines!(ax, P[k].t, Y[k])
-        ax.xlabel = "t"
-        ax.ylabel = feats[k]
-        ax.title = "$ts"
-        push!(axes, ax)
+    for (k, feat) in enumerate(feats)
+        lines!(ax, P[k].t, Y[k], label=feat)
     end
+    ax.xlabel = "t"
+    axislegend(ax)
+    ax.title = "$ts"
 
     return axes, fig
 end
@@ -80,7 +77,7 @@ function plot_1D_features(ts::Tuple{String, Number}, feat::String, shade::Bool; 
     if short_IP
         t = Dict("IP" => FTIPs[ts], "NBI" => FTNBI[ts])
     else
-        t = Dict("IP" => FTIPs[ts], "NBI" => FTNBI[ts])
+        t = Dict("IP" => FTIP[ts], "NBI" => FTNBI[ts])
     end 
     BV = Dict("IP" => (t["IP"][1] .< P.t .< t["IP"][2]), "NBI" => (t["NBI"][1] .< P.t .< t["NBI"][2]))
 
@@ -99,7 +96,7 @@ function plot_1D_features(ts::Tuple{String, Number}, feat::String, shade::Bool; 
     Legend(fig[1, 2], ax, framevisible=false)
     return fig
 end
-function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}, shade::Bool; kwargs...)
+function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}, shade::Bool; short_IP::Bool=false, kwargs...)
     if !shade
         return plot_1D_features(ts, feats)
     end 
@@ -110,7 +107,11 @@ function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}, shad
     P = [profiles(ts..., feat) for feat in feats]  
     Y = [abs.(P[n].y.y.*normalise_2D_features[feat]) for (n, feat) in enumerate(feats)]
 
-    t = Dict("IP" => FTIP[ts], "NBI" => FTNBI[ts])
+    if short_IP
+        t = Dict("IP" => FTIPs[ts], "NBI" => FTNBI[ts])
+    else
+        t = Dict("IP" => FTIP[ts], "NBI" => FTNBI[ts])
+    end 
     BV = Dict("IP" => [(t["IP"][1] .< P[k].t .< t["IP"][2]) for k in 1:ℓ], "NBI" => [(t["NBI"][1] .< P[k].t .< t["NBI"][2]) for k in 1:ℓ])
     
     x_shade = Dict("IP" => [P[k].t[BV["IP"][k]] for k in 1:ℓ], "NBI" => [P[k].t[BV["NBI"][k]] for k in 1:ℓ])
