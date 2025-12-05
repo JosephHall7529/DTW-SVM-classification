@@ -64,7 +64,7 @@ function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}; kwar
     axislegend(ax)
     ax.title = "$ts"
 
-    return axes, fig
+    return fig, ax
 end
 function plot_1D_features(ts::Tuple{String, Number}, feat::String, shade::Bool; short_IP::Bool=false, kwargs...) 
     if !shade
