@@ -318,6 +318,8 @@ struct hybrid_classification
     end
 end
 
+
+
 mutable struct DTW_hyp
     tok_shots::Vector{Tuple{String, Int}}
     features::Vector{String}
@@ -331,130 +333,6 @@ mutable struct DTW_hyp
     function DTW_hyp()
         new()
     end
-    # function DTW_hyp(features::Vector{String}, radius::Number=3; L=50, transportcost=1.1, short_IP::Bool=false) 
-    #     tok_shotz = tok_shots(which(features))
-        
-    #     profile_data = Dict{Tuple, Array{Float64}}()
-    #     flat_top_data = Dict{Tuple, Array{Float64}}()
-
-    #     ℓf = length(features)
-    #     ℓT = length(tok_shotz)
-        
-    #     dict_shot = Dict(1:ℓT .=> tok_shotz)
-    #     shot_dict = Dict(tok_shotz .=> 1:ℓT)
-
-    #     LSD = least_data_length(tok_shotz, features; short_IP=short_IP)
-    #     for (i, ts) in enumerate(tok_shotz)
-    #         Random.seed!(i)
-    #         mat_ip = Float64[]
-    #         mat_nbi = Float64[]
-
-    #         IP_step_constraint = LSD[ts]["IP"] 
-    #         if IP_step_constraint.length > L
-    #             IP_step_constraint = merge(IP_step_constraint, (length=L,))
-    #         end
-    #         NBI_step_constraint = LSD[ts]["NBI"] 
-    #         if NBI_step_constraint.length > L
-    #             NBI_step_constraint = merge(NBI_step_constraint, (length=L,))
-    #         end
-
-    #         # println(ts)
-    #         constraint_feature_IP = profiles(ts..., IP_step_constraint.feat).t
-    #         if short_IP
-    #             constraint_time_IP = constraint_feature_IP[FTIPs[ts][1] .< constraint_feature_IP .< FTIPs[ts][2]]
-    #         else
-    #             constraint_time_IP = constraint_feature_IP[FTIP[ts][1] .< constraint_feature_IP .< FTIP[ts][2]]
-    #         end
-    #         constraint_step_IP = div(length(constraint_time_IP), IP_step_constraint.length)
-    #         constraint_time_IP = constraint_time_IP[1:constraint_step_IP:end] 
-    #         constraint_feature_NBI = profiles(ts..., NBI_step_constraint[1]).t
-    #         constraint_time_NBI = constraint_feature_NBI[FTNBI[ts][1] .< constraint_feature_NBI .< FTNBI[ts][2]]
-    #         constraint_step_NBI = div(length(constraint_time_NBI), NBI_step_constraint.length)
-    #         constraint_time_NBI = constraint_time_NBI[1:constraint_step_NBI:end] 
-
-    #         for (n, feat) in enumerate(features)
-    #             P = profiles(ts..., feat)
-
-    #             ind = Vector{Int}()
-    #             for t in constraint_time_IP
-    #                 ind_last = findlast(i -> i <= t, P.t)
-    #                 if ind_last == nothing
-    #                     push!(ind, findfirst(i -> i >= t, P.t))
-    #                 else
-    #                     push!(ind, ind_last)
-    #                 end
-    #             end
-    #             append!(mat_ip, abs.(P.y[ind, 1].*normalise_2D_features[feat]))
-                
-    #             ind = Vector{Int}()
-    #             for t in constraint_time_NBI
-    #                 ind_last = findlast(i -> i <= t, P.t)
-    #                 if ind_last == nothing
-    #                     push!(ind, findfirst(i -> i >= t, P.t))
-    #                 else
-    #                     push!(ind, ind_last)
-    #                 end
-    #             end
-    #             append!(mat_nbi, abs.(P.y[ind, 1].*normalise_2D_features[feat]))
-
-    #             if n == ℓf
-    #                 append!(mat_ip, constraint_time_IP)
-    #                 append!(mat_nbi, constraint_time_NBI)
-    #             end
-    #         end
-
-    #         profile_data[ts] = reshape(mat_ip, :, ℓf+1)'
-    #         flat_top_data[ts] = reshape(mat_nbi, :, ℓf+1)'
-    #     end
-
-    #     cosine_cost = zeros(ℓT, ℓT)
-    #     magnitude_cost = zeros(ℓT, ℓT)
-
-    #     path_cos_ℓ = zeros(ℓT, ℓT) 
-    #     path_mag_ℓ = zeros(ℓT, ℓT) 
-    #     for i in ProgressBar(1:ℓT)
-    #         for j in 1:ℓT
-    #             data_j = profile_data[dict_shot[j]]
-    #             data_i = profile_data[dict_shot[i]]
-
-    #             COST_cos, path_cos_a, path_cos_b = dtw(data_j, data_i, CosineDist(); transportcost=transportcost)
-    #             cosine_cost[i, j] = COST_cos
-    #             path_cos_ℓ[i, j] = length(path_cos_a)
-
-    #             data_j = flat_top_data[dict_shot[j]]
-    #             data_i = flat_top_data[dict_shot[i]]
-    #             COST_mag, path_mag_a, path_mag_b = dtw(data_j, data_i, Cityblock(); transportcost=transportcost)
-    #             magnitude_cost[i, j] = COST_mag
-    #             path_mag_ℓ[i, j] = length(path_mag_a)
-    #         end
-    #     end
-        
-    #     cosine_cost = round.(cosine_cost ./ path_cos_ℓ, sigdigits=5)
-    #     # magnitude_cost = round.(magnitude_cost, sigdigits=5) 
-    #     total_cost = hypot.(cosine_cost, magnitude_cost)
-        
-    #     df_names = df_ts_naming(tok_shotz)
-
-    #     # println(size(cosine_cost))
-
-    #     cosine_cost = DataFrame(cosine_cost[:, :], df_names)
-    #     magnitude_cost = DataFrame(magnitude_cost[:, :], df_names) 
-    #     total_cost = DataFrame(total_cost[:, :], df_names) 
-    #     insertcols!(cosine_cost, 1, :shots => tok_shotz) 
-    #     insertcols!(magnitude_cost, 1, :shots => tok_shotz)
-    #     insertcols!(total_cost, 1, :shots => tok_shotz)
-
-    #     new(tok_shotz, 
-    #         features, 
-    #         radius, 
-    #         shot_dict, 
-    #         profile_data, 
-    #         flat_top_data,
-    #         cosine_cost,
-    #         magnitude_cost,
-    #         total_cost
-    #     )
-    # end
     function DTW_hyp(tok_shotz::Vector{Tuple{String, Int}}, features::Vector{String}; L=50, transportcost=1.1, short_IP::Bool=false) 
         
         profile_data = Dict{Tuple, Array{Float64}}()
@@ -469,7 +347,6 @@ mutable struct DTW_hyp
 
         LSD = least_data_length(tok_shotz, features; short_IP=short_IP)
         for (i, ts) in enumerate(tok_shotz)
-            Random.seed!(i)
             mat_ip = Float64[]
             mat_nbi = Float64[]
 
@@ -491,11 +368,11 @@ mutable struct DTW_hyp
             println(ts, ": ", length(constraint_time_IP), " ", IP_step_constraint.length)
             constraint_step_IP = div(length(constraint_time_IP), IP_step_constraint.length)
             constraint_time_IP = constraint_time_IP[1:constraint_step_IP:end] 
+
             constraint_feature_NBI = profiles(ts..., NBI_step_constraint[1]).t
             constraint_time_NBI = constraint_feature_NBI[FTNBI[ts][1] .< constraint_feature_NBI .< FTNBI[ts][2]]
             constraint_step_NBI = div(length(constraint_time_NBI), NBI_step_constraint.length)
             constraint_time_NBI = constraint_time_NBI[1:constraint_step_NBI:end] 
-
             for (n, feat) in enumerate(features)
                 P = profiles(ts..., feat)
 
@@ -509,7 +386,7 @@ mutable struct DTW_hyp
                     end
                 end
                 append!(mat_ip, abs.(P.y[ind, 1].*normalise_2D_features[feat]))
-                
+
                 ind = Vector{Int}()
                 for t in constraint_time_NBI
                     ind_last = findlast(i -> i <= t, P.t)
@@ -598,7 +475,7 @@ function hyperparameters_meta!(HYP::hyper_parameters; N::Int=50)
     HYP.hyperparameters_meta = DataFrame()
     begin
         cntmap = countmap(values(HYP.labelled_data))
-        CLn, CEn, COn = cntmap["C-LH"], cntmap["C-EH"], cntmap["CO"]
+        CLn, CEn, COn = cntmap["LH"], cntmap["EH"], cntmap["CO"]
         labelled_ts = collect(HYP.labelled_data |> keys)
         labelled_y = collect(HYP.labelled_data |> values)
         shot_dict = Dict([a => n for (n, a) in enumerate(HYP.data.tok_shots)])
@@ -615,7 +492,7 @@ function hyperparameters_meta!(HYP::hyper_parameters; N::Int=50)
     Results = DataFrame()
     for S in 0:N
         begin
-            train_ind = training_partion(HYP.labelled_data, labels, k, S=S)
+            train_ind = training_partition(HYP.labelled_data, labels, k, S=S)
 
             K = X[labelled_ind[train_ind], labelled_ind[train_ind]]
             model = svmtrain(K, labelled_y[train_ind], kernel=Kernel.Precomputed, cost=C_)
@@ -627,15 +504,15 @@ function hyperparameters_meta!(HYP::hyper_parameters; N::Int=50)
             acc = Accuracy()(ỹ, labelled_y[Not(train_ind)])
             b_acc = BalancedAccuracy()(ỹ, labelled_y[Not(train_ind)])
 
-            fpr = MulticlassFalsePositiveRate(;levels=["C-LH", "C-EH", "CO"], perm=[3,2,1])(ỹ, labelled_y[Not(train_ind)])
+            fpr = MulticlassFalsePositiveRate(;levels=["LH", "EH", "CO"], perm=[1,2,3])(ỹ, labelled_y[Not(train_ind)])
             println("accuracy = $(acc), balanced accuracy = $(b_acc), false positive rate = $(fpr)")
 
             SVL, SVE, SVO = model.SVs.nSV
             println(SVL, ", $(SVE), $(SVO)")
             cnt_map = countmap(ỹ)
             no_CO = haskey(cnt_map, "CO") ? cnt_map["CO"] : 0
-            no_EH = haskey(cnt_map, "C-EH") ? cnt_map["C-EH"] : 0
-            no_LH = haskey(cnt_map, "C-LH") ? cnt_map["C-LH"] : 0
+            no_EH = haskey(cnt_map, "EH") ? cnt_map["EH"] : 0
+            no_LH = haskey(cnt_map, "LH") ? cnt_map["LH"] : 0
 
             int = OrderedDict("rng" => S, "Accuracy" => round(acc, digits=3), "Balanced Accuracy" => round(b_acc, digits=3), "False Positive Rate" => round(fpr, digits=4),
                 "#SV LH" => SVL, "#SV EH" => SVE, "#SV CO" => SVO,

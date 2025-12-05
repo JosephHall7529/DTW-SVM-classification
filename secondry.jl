@@ -335,6 +335,10 @@ end
 function flat_top_NBI(tok_shots::Vector{Tuple{String, Int64}}, percentage::Float64=0.8) 
     dict = Dict{Tuple, Tuple}()
     for ts in tok_shots
+        P = profiles(ts..., "PNBI")
+        P.y.y .= movavg(P.y.y, 300).x
+        P = profiles(ts..., "IP")
+        P.y.y .= movavg(P.y.y, 300).x
         if in(ts[2], [8121, 11175, 13885, 15632, 15634, 15653, 22832])
             dict[ts] = (1.6, 3.5)
             continue
@@ -449,4 +453,8 @@ function cardinality_metadata(D::DataFrame, feature::Symbol; name::Symbol=:cardi
     df = DataFrame(feature => "Total", name => sum(no_of_points[!, name]))
     no_of_points = vcat(no_of_points, df)
     return no_of_points
+end
+
+function smooth_NBI()
+
 end

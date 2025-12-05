@@ -76,7 +76,6 @@ function profiles(data::data2D, tok, shot::Int64, feat::String)
     end 
 end
 
-
 # profile data
 function id(ts::Tuple{String, Int})
     id = String((@subset id_codes_2D @byrow begin 
@@ -320,7 +319,7 @@ function classification_v1!()
     DATA_
 end
 
-import MLJ.training_parition
+# import MLJ.training_partition
 function training_partition(labelled_data::OrderedDict, labels::Vector{String}, k::Int=2; S::Int=123)
     ℓ = countmap(labelled_data |> values)
 
@@ -429,7 +428,7 @@ function hyper_parameter_search(data::DTW_hyp, labelled_data::OrderedDict{Tuple{
         acc_int = [zeros(nc, nft) for _ in 1:nthreads()+1]
 
         Threads.@threads for S in ProgressBar(1:N)
-            train_ind = training_partion(labelled_data, labels, k, S=S)
+            train_ind = training_partition(labelled_data, labels, k, S=S)
             for (i, j) in Iterators.product(1:nc, 1:nft)
                 CC = Cs[i, j][1]
                 FTC = Cs[i, j][2]

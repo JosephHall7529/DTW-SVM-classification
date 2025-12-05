@@ -69,7 +69,7 @@ function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}; kwar
 
     return axes, fig
 end
-function plot_1D_features(ts::Tuple{String, Number}, feat::String, shade::Bool; kwargs...) 
+function plot_1D_features(ts::Tuple{String, Number}, feat::String, shade::Bool; short_IP::Bool=false, kwargs...) 
     if !shade
         return plot_1D_features(ts, feat)
     end 
@@ -77,7 +77,11 @@ function plot_1D_features(ts::Tuple{String, Number}, feat::String, shade::Bool; 
     P = profiles(ts..., feat)
     Y = abs.(P.y.y .* normalise_2D_features[feat])
 
-    t = Dict("IP" => FTIP[ts], "NBI" => FTNBI[ts])
+    if short_IP
+        t = Dict("IP" => FTIPs[ts], "NBI" => FTNBI[ts])
+    else
+        t = Dict("IP" => FTIPs[ts], "NBI" => FTNBI[ts])
+    end 
     BV = Dict("IP" => (t["IP"][1] .< P.t .< t["IP"][2]), "NBI" => (t["NBI"][1] .< P.t .< t["NBI"][2]))
 
     x_shade = Dict("IP" => P.t[BV["IP"]], "NBI" => P.t[BV["NBI"]])
@@ -92,7 +96,7 @@ function plot_1D_features(ts::Tuple{String, Number}, feat::String, shade::Bool; 
     ax.xlabel = "t"
     ax.ylabel = feat
     ax.title = "$ts"
-    axislegend(ax, position=:lt)
+    Legend(fig[1, 2], ax, framevisible=false)
     return fig
 end
 function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}, shade::Bool; kwargs...)
@@ -245,10 +249,10 @@ function compare_plot(shot_1::Tuple{String, Int}, shot_2::Tuple{String, Int}, x1
         ax4.yticks = 0:0.5:2.5
         ax4.yticks = 0:0.5:2.5
     end
-    # linkxaxes!(ax2, ax1)
-    # linkxaxes!(ax4, ax3)
-    # linkyaxes!(ax3, ax1)
-    # linkyaxes!(ax4, ax2)
+    linkxaxes!(ax2, ax1)
+    linkxaxes!(ax4, ax3)
+    linkyaxes!(ax3, ax1)
+    linkyaxes!(ax4, ax2)
     # if disp
     #     # display(GLMakie.Screen(), fig1)
     # else
@@ -621,3 +625,12 @@ function overview_fit(model_::DTW_SVM, svmmodel, test_X, test_y=[""])
 	# # display(GLMakie.Screen(), f)
 	f
 end
+
+# function evaluation_plot(data_::Dict{Symbol, Dict{String, classification_performance}})
+#     f = Figure();
+#     a = Axis(f[1,1])
+    
+#     for i in 1:5
+#         hist!(ax, randn(1000), scale_to=-0.6, offset=i, direction=:x)
+#     end
+# end
