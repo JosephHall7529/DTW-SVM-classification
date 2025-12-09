@@ -188,6 +188,59 @@ let
 	fig1
 end
 
+# Figure 4
+let 
+	f = Figure()
+	a1 = Axis(f[1, 1])
+
+	AUG_NBI = AUG_profile_extract(34841)
+	for feat in ["PNBI"]
+		dat = AUG_NBI.data[AUG_dict[feat]][feat]
+		P = profiles(("aug", 34841)..., feat)
+
+		lines!(a1, dat.t, dat.y.y .* normalise_2D_features[feat], color=(:gray, 0.45), linestyle=:dashdot, linewidth=1.6)
+		lines!(a1, P.t, P.y.y .* normalise_2D_features[feat], color=:black)
+	end
+
+	a1.xticks = 0:1:10
+	a1.yticks = 0:2:6
+	a1.limits = ((0.5, 9), nothing)
+	
+	f
+end
+# let 
+# 	f = Figure()
+# 	a1 = Axis(f[1, 1])
+
+# 	AUG_NBI = AUG_profile_extract(34841)
+# 	for feat in ["IP", "PNBI", "PECRH", "PICRH"]
+# 		dat = AUG_NBI.data[AUG_dict[feat]][feat]
+# 		P = profiles(("aug", 34841)..., feat)
+
+# 		lines!(a1, dat.t, dat.y.y .* normalise_2D_features[feat], color=(:gray, 0.45), linestyle=:dashdot, linewidth=1.6)
+# 		lines!(a1, P.t, P.y.y .* normalise_2D_features[feat], color=:black)
+# 	end
+
+# 	a1.xticks = 0:1:10
+# 	a1.yticks = 0:2:6
+# 	a1.limits = ((0.5, 8.5), nothing)
+	
+# 	a2 = Axis(f[2, 1])
+
+# 	for feat in ["Q95", "BETAPOL", "NGW", "LI"]
+# 		dat = AUG_NBI.data[AUG_dict[feat]][feat]
+# 		P = profiles(("aug", 34841)..., feat)
+		
+# 		lines!(a2, dat.t, abs.(dat.y.y) .* normalise_2D_features[feat], color=(:gray, 0.45), linestyle=:dashdot, linewidth=1.6)
+# 		lines!(a2, P.t, abs.(P.y.y) .* normalise_2D_features[feat], color=:black)
+# 	end
+# 	a2.xticks = 0:1:10
+# 	a2.yticks = 0:2:6
+# 	a2.limits = ((0.5, 8.5), (0, 6))
+
+# 	f
+# end
+
 # Figure ?
 let 
     CLn, CEn, COn = 20, 20, 10
@@ -649,7 +702,7 @@ let
 	# end
 	# Label(f[0, :], text = "", fontsize = 20)
 	# save("/Users/joe/Project/PhD/EuroFusion/EUROfusion_ML_2024/Presentations/Multidimensional_qunatity_classification_20_01_25/CO_EH_LH_classification.png", f)
-	display(GLMakie.Screen(), f)
+	# display(GLMakie.Screen(), f)
 	# f
 end
 
