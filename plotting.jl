@@ -58,7 +58,11 @@ function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}; kwar
     ax = Axis(fig[1, 1]);
 
     for (k, feat) in enumerate(feats)
-        lines!(ax, P[k].t, Y[k], label=feat)
+        if feat == ["PNBI"]
+            lines!(ax, P[k].t, Y[k]./10, label=feat) 
+        else
+            lines!(ax, P[k].t, Y[k], label=feat)
+        end
     end
     ax.xlabel = "t"
     axislegend(ax)
@@ -102,8 +106,6 @@ function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}, shad
     end 
     
     ℓ = length(feats)
-    layout, □ = plot_layout(ℓ) 
-
     P = [profiles(ts..., feat) for feat in feats]  
     Y = [abs.(P[n].y.y.*normalise_2D_features[feat]) for (n, feat) in enumerate(feats)]
 
@@ -117,22 +119,19 @@ function plot_1D_features(ts::Tuple{String, Number}, feats::Vector{String}, shad
     x_shade = Dict("IP" => [P[k].t[BV["IP"][k]] for k in 1:ℓ], "NBI" => [P[k].t[BV["NBI"][k]] for k in 1:ℓ])
     y_shade = Dict("IP" => [Y[k][BV["IP"][k]] for k in 1:ℓ], "NBI" => [Y[k][BV["NBI"][k]] for k in 1:ℓ])
 
-    fig = Figure(size=□);
-    
-    axes = []
-    for (k, sub_) in enumerate(layout)
-        ax = Axis(fig[sub_...]; kwargs...)
+    fig = Figure();
+    ax = Axis(fig[1, 1])
+    for k in 1:ℓ
         lines!(ax, P[k].t, Y[k])
         band!(ax, x_shade["IP"][k], 0, y_shade["IP"][k], color=(:red, 0.2), label="90% IP")
         band!(ax, x_shade["NBI"][k], 0, y_shade["NBI"][k], color=(:blue, 0.2), label="80% NBI")
-        ax.xlabel = "t"
-        ax.ylabel = "$(feats[k])"
-        push!(axes, ax)
-    end
-	axes[1].title = "$(ts[1]) #$(ts[2])"
-    axislegend(axes[minimum([4, ℓ])], position=:lt)
-    display(fig)
-    return axes, fig
+    end 
+    ax.xlabel = "t"
+	ax.title = "$(ts[1]) #$(ts[2])"
+    ax.limits=((0,7),nothing)
+    axislegend(ax, position=:lt, merge=true, unique=true)
+
+    return fig, ax
 end
 
 function overview_plot(ts::Tuple{String, Number}, x1_lim::Union{Nothing, Tuple}=nothing; disp::Bool=false, band::String="")
@@ -459,20 +458,20 @@ function overview_fit(model_::DTW_SVM, svmmodel, test_X, test_y=[""])
         fig_model = deepcopy(model_)
         training = fig_model.database.training_data
 
-        labels = String.(unique(training.metadata.y))
+        labels = String.(unique(training.metadata.label))
         label_length = length(labels)
 
 		MLJBase.predict(fig_model, svmmodel, test_X)
         testing = fig_model.database.testing_data
 
         if test_y !== [""]
-            testing.metadata.actual = [test_y[ind] for ind in testing.metadata.order]
-            sort!(testing.metadata, [:actual, :tok_shots], rev=[true, false])
+            testing.metadata.actual = test_y
+            sort!(testing.metadata, [:actual, :shots], rev=[true, false])
         end
     end
     # explicitly calculating the kernel element of cosine and flat top
     begin
-        df_names = df_ts_naming(testing.metadata.tok_shots)
+        df_names = df_ts_naming(testing.metadata.shots)
 
 		dat = Array(testing.cosine_cost[:, df_names])
 		mat_c = exp.(-(dat ./ fig_model.C_cosine).^2)
@@ -483,148 +482,149 @@ function overview_fit(model_::DTW_SVM, svmmodel, test_X, test_y=[""])
 		mat = mat_c .* mat_ft
 	end
 
-	gl1 = f[1:2, 1] = GridLayout()
-	begin
-        col_dict = Dict("LH"=>3, "EH"=>2, "CO"=>1)
+	# gl1 = f[1:2, 1] = GridLayout()
+	# begin
+    #     col_dict = Dict("LH"=>3, "EH"=>2, "CO"=>1)
 
-		axmain = Axis(gl1[1, 1], xlabel="training", ylabel="test")
-		he = heatmap!(axmain, mat, colormap=:oslo)
+	# 	axmain = Axis(gl1[1, 1], xlabel="training", ylabel="test")
+	# 	he = heatmap!(axmain, mat, colormap=:oslo)
 
-		if test_y !==[""]
-            cntmap = Dict([label => count(i -> i == label, testing.metadata.actual) for label in labels])
-        else
-            cntmap = Dict([label => count(i -> i == label, testing.metadata.y) for label in labels]) 
-        end
-        k = Dict([label => count(i -> i == label, training.metadata.y) for label in labels])
-        labels = vcat([""], labels)
-        cntmap[""] = 0
-        k[""] = 0
+	# 	if test_y !==[""]
+    #         cntmap = Dict([label => count(i -> i == label, testing.metadata.actual) for label in labels])
+    #     else
+    #         cntmap = Dict([label => count(i -> i == label, testing.metadata.y) for label in labels]) 
+    #     end
+    #     k = Dict([label => count(i -> i == label, training.metadata.label) for label in labels])
+    #     labels = vcat([""], labels)
+    #     cntmap[""] = 0
+    #     k[""] = 0
 
-        for i in 3:label_length+1
-            vertical_x0 = [sum(k[labels[j]] for j in 1:i-1)+0.5]
-            vertical_y0 = sum(cntmap[labels[j]] for j in 1:i-2) + 0.5 
-            vertical_y1 = sum(cntmap[labels[j]] for j in 1:i) + 0.5
+    #     for i in 3:label_length+1
+    #         vertical_x0 = [sum(k[labels[j]] for j in 1:i-1)+0.5]
+    #         vertical_y0 = sum(cntmap[labels[j]] for j in 1:i-2) + 0.5 
+    #         vertical_y1 = sum(cntmap[labels[j]] for j in 1:i) + 0.5
 
-            horizontal_x0 = sum(k[labels[j]] for j in 1:i-2) + 0.5
-            horizontal_x1 = sum(k[labels[j]] for j in 1:i) + 0.5
-            horizontal_y0 = [sum(cntmap[labels[j]] for j in 1:i-1)+0.5] 
+    #         horizontal_x0 = sum(k[labels[j]] for j in 1:i-2) + 0.5
+    #         horizontal_x1 = sum(k[labels[j]] for j in 1:i) + 0.5
+    #         horizontal_y0 = [sum(cntmap[labels[j]] for j in 1:i-1)+0.5] 
             
-            lines!(axmain, vertical_x0, [vertical_y0, vertical_y1], color=:white, linewidth=4)
-            lines!(axmain, [horizontal_x0, horizontal_x1], horizontal_y0, color=:white, linewidth=4)
-        end
+    #         lines!(axmain, vertical_x0, [vertical_y0, vertical_y1], color=:white, linewidth=4)
+    #         lines!(axmain, [horizontal_x0, horizontal_x1], horizontal_y0, color=:white, linewidth=4)
+    #     end
 
-        labels = labels[2:end]
+    #     labels = labels[2:end]
         
-		Colorbar(gl1[1, 2], he, ticks=0:0.1:1)
+	# 	Colorbar(gl1[1, 2], he, ticks=0:0.1:1)
 	
-		axmain.xticks = (1:length(training.metadata.tok_shots), ["#$j" for (i, j) in training.metadata.tok_shots])
-		axmain.xticklabelrotation = π/2
-		axmain.yticks = (1:length(testing.metadata.tok_shots), ["#$j" for (i, j) in testing.metadata.tok_shots])
+	# 	axmain.xticks = (1:length(training.metadata.shots), ["#$j" for (i, j) in training.metadata.shots])
+	# 	axmain.xticklabelrotation = π/2
+	# 	axmain.yticks = (1:length(testing.metadata.shots), ["#$j" for (i, j) in testing.metadata.shots])
 
-		# axmain.title = "C-LH 								C-EH 									CO"
-	end
+	# 	# axmain.title = "C-LH 								C-EH 									CO"
+	# end
+    # f
 	
-	gl2 = f[1:3, 2] = GridLayout()
-	let
-        start = 1
-        stop = 0
-        for (n, label) in enumerate(labels)
-            axleftCL = Axis(gl2[n, 1], xticks=(0.7:0.2:0.7, [L"\mathrm{DTW_{cos}}|_{I_p^{80%}}"]), xticklabelsize=20, 
-                limits=(nothing, (0, 1.)), ylabel=label, ylabelsize=15)
-            axmidCL = Axis(gl2[n, 2], xticks=(0.7:1:0.7, [L"\mathrm{DTW_{mag}}|_{P_{NBI}^{70%}}"]), xticklabelsize=20,
-                limits=(nothing, (0, 1.)))
-            axrightCL = Axis(gl2[n, 3], xticks=(0.7:1:0.7, [L"K"]), xticklabelsize=20, limits=(nothing, (0, 1.)))
+	# gl2 = f[1:3, 2] = GridLayout()
+	# let
+    #     start = 1
+    #     stop = 0
+    #     for (n, label) in enumerate(labels)
+    #         axleftCL = Axis(gl2[n, 1], xticks=(0.7:0.2:0.7, [L"\mathrm{DTW_{cos}}|_{I_p^{80%}}"]), xticklabelsize=20, 
+    #             limits=(nothing, (0, 1.)), ylabel=label, ylabelsize=15)
+    #         axmidCL = Axis(gl2[n, 2], xticks=(0.7:1:0.7, [L"\mathrm{DTW_{mag}}|_{P_{NBI}^{70%}}"]), xticklabelsize=20,
+    #             limits=(nothing, (0, 1.)))
+    #         axrightCL = Axis(gl2[n, 3], xticks=(0.7:1:0.7, [L"K"]), xticklabelsize=20, limits=(nothing, (0, 1.)))
 
-            ℓ = size(training.metadata, 1)
+    #         ℓ = size(training.metadata, 1)
 
-            stop += k[label]
-            rng = start:stop
+    #         stop += k[label]
+    #         rng = start:stop
             
-            CD = vcat([mat_c[i, 1:end] for i in rng]...)
-            hist!(axleftCL, CD, normalization=:probability, scale_to=-0.6, offset=1, direction=:x, color=:gray70)
-            CD = vcat([mat_ft[i, 1:end] for i in rng]...)
-            hist!(axmidCL, CD, normalization=:probability, scale_to=-0.6, offset=1, direction=:x, color=:gray70)
-            CD = vcat([mat[i, 1:end] for i in rng]...)
-            hist!(axrightCL, CD, normalization=:probability, scale_to=-0.6, offset=1, direction=:x, color=:gray70)
-		end
-        # if σ
-		# 	for (N, te) in enumerate(teind) 
-		# 		val, ind = findmax(mat[rng, te])
-		# 		println("C-LH train_ind: ", labelled_ts[train_ind][rng[1]+ind-1], ", K = $(round(val, digits=2))")
-		# 		hlines!(axleftCL, mat_c[rng[1]+ind-1, te], color=colors[N])
-		# 		hlines!(axmidCL, mat_ft[rng[1]+ind-1, te], color=colors[N])
-		# 		hlines!(axrightCL, val, color=colors[N])
-		# 	end
-		# end
-	end
+    #         CD = vcat([mat_c[i, 1:end] for i in rng]...)
+    #         hist!(axleftCL, CD, normalization=:probability, scale_to=-0.6, offset=1, direction=:x, color=:gray70)
+    #         CD = vcat([mat_ft[i, 1:end] for i in rng]...)
+    #         hist!(axmidCL, CD, normalization=:probability, scale_to=-0.6, offset=1, direction=:x, color=:gray70)
+    #         CD = vcat([mat[i, 1:end] for i in rng]...)
+    #         hist!(axrightCL, CD, normalization=:probability, scale_to=-0.6, offset=1, direction=:x, color=:gray70)
+	# 	end
+    #     # if σ
+	# 	# 	for (N, te) in enumerate(teind) 
+	# 	# 		val, ind = findmax(mat[rng, te])
+	# 	# 		println("C-LH train_ind: ", labelled_ts[train_ind][rng[1]+ind-1], ", K = $(round(val, digits=2))")
+	# 	# 		hlines!(axleftCL, mat_c[rng[1]+ind-1, te], color=colors[N])
+	# 	# 		hlines!(axmidCL, mat_ft[rng[1]+ind-1, te], color=colors[N])
+	# 	# 		hlines!(axrightCL, val, color=colors[N])
+	# 	# 	end
+	# 	# end
+	# end
 	
-	gl3 = f[3, 1] = GridLayout()
-	let
-        ỹ = testing.metadata.y
+	# gl3 = f[3, 1] = GridLayout()
+	# let
+    #     ỹ = testing.metadata.y
 
-        if test_y !== [""]
-            ŷ = testing.metadata.actual
+    #     if test_y !== [""]
+    #         ŷ = testing.metadata.actual
 
-            println("Accuracy: ", Accuracy()(ỹ, ŷ), 
-                "\nBalaced Accuracy: ", BalancedAccuracy()(ỹ, ŷ), 
-                "\nFalse Positive Rate: ", MulticlassFalsePositiveRate(;levels=["LH", "EH", "CO"], perm=[3,2,1])(ỹ, ŷ))
-        end
-        conf = hcat([reshape(conf, :, 1) for conf in testing.metadata.confidence]...)
+    #         println("Accuracy: ", Accuracy()(ỹ, ŷ), 
+    #             "\nBalaced Accuracy: ", BalancedAccuracy()(ỹ, ŷ), 
+    #             "\nFalse Positive Rate: ", MulticlassFalsePositiveRate(;levels=["LH", "EH", "CO"], perm=[3,2,1])(ỹ, ŷ))
+    #     end
+    #     conf = hcat([reshape(conf, :, 1) for conf in testing.metadata.confidence]...)
 
-		axmain = Axis3(gl3[1:2, 1:5], azimuth=-0.53π, xlabelvisible=false, ylabelvisible=false,
-			zlabelvisible=false, viewmode=:stretch, elevation=0.05π)
-		axleg = Axis(gl3[1:2, 0])
-		hidedecorations!(axleg)
-		hidespines!(axleg)
+	# 	axmain = Axis3(gl3[1:2, 1:5], azimuth=-0.53π, xlabelvisible=false, ylabelvisible=false,
+	# 		zlabelvisible=false, viewmode=:stretch, elevation=0.05π)
+	# 	axleg = Axis(gl3[1:2, 0])
+	# 	hidedecorations!(axleg)
+	# 	hidespines!(axleg)
 
-        if test_y !== [""]
-            scatter!(axmain, conf[1, :], conf[2, :], conf[3, :]; colormap=:tab10,
-                color=[col_dict[el] for el in ỹ],
-                strokewidth = 0.1,
-                label = [label => (;colormap=:tab10, colorrange=(1, 3), color=col_dict[label]) for label in ỹ],
-                markersize = [(i == j ? 20 : 10) for (i, j) in zip(ŷ, ỹ)],
-                marker = [(i == j ? '∘' : (:utriangle)) for (i, j) in zip(ŷ, ỹ)]
-            )	
-        else
-            scatter!(axmain, conf[:, 1], conf[:, 2], conf[:, 3]; colormap=:tab10,
-                color=[col_dict[el] for el in ỹ],
-                strokewidth = 0.1,
-                label = [label => (;colormap=:tab10, colorrange=(1, 3), color=col_dict[label]) for label in ỹ],
-                markersize = 10,
-                marker = utriangle
-            )	
-        end
-		scatter!(axmain, [0], [0], [0], color=(:gray40, 0.3), markersize=20, strokewidth=0.2)
+    #     if test_y !== [""]
+    #         scatter!(axmain, conf[1, :], conf[2, :], conf[3, :]; colormap=:tab10,
+    #             color=[col_dict[el] for el in ỹ],
+    #             strokewidth = 0.1,
+    #             label = [label => (;colormap=:tab10, colorrange=(1, 3), color=col_dict[label]) for label in ỹ],
+    #             markersize = [(i == j ? 20 : 10) for (i, j) in zip(ŷ, ỹ)],
+    #             marker = [(i == j ? '∘' : (:utriangle)) for (i, j) in zip(ŷ, ỹ)]
+    #         )	
+    #     else
+    #         scatter!(axmain, conf[:, 1], conf[:, 2], conf[:, 3]; colormap=:tab10,
+    #             color=[col_dict[el] for el in ỹ],
+    #             strokewidth = 0.1,
+    #             label = [label => (;colormap=:tab10, colorrange=(1, 3), color=col_dict[label]) for label in ỹ],
+    #             markersize = 10,
+    #             marker = utriangle
+    #         )	
+    #     end
+	# 	scatter!(axmain, [0], [0], [0], color=(:gray40, 0.3), markersize=20, strokewidth=0.2)
 		
-		pos = [(:right, :bottom), (:left, :bottom), (:right, :top), (:left, :top)]
-		# shuffle!(Random.seed!(3), testing.metadata)
-        for (n,row) in enumerate(eachrow(testing.metadata))
-            text!(axmain, row.confidence..., text="$(row.tok_shots[2])", align=pos[mod(n+1,4)+1], fontsize=12, color=:gray40)
-        end
+	# 	pos = [(:right, :bottom), (:left, :bottom), (:right, :top), (:left, :top)]
+	# 	# shuffle!(Random.seed!(3), testing.metadata)
+    #     for (n,row) in enumerate(eachrow(testing.metadata))
+    #         text!(axmain, row.confidence..., text="$(row.shots[2])", align=pos[mod(n+1,4)+1], fontsize=12, color=:gray40)
+    #     end
 
-		group_marker = [MarkerElement(marker = marker, color = :black,
-			strokecolor = :transparent, markersize = markersize) for (marker, markersize) in zip([:utriangle, '∘'], [12, 27])]
+	# 	group_marker = [MarkerElement(marker = marker, color = :black,
+	# 		strokecolor = :transparent, markersize = markersize) for (marker, markersize) in zip([:utriangle, '∘'], [12, 27])]
 
-		Legend(gl3[1, 0], group_marker, ["incorrectly \n predicted", "correctly \n predicted"], 
-			framevisible=false, labelsize=14, halign=:left, valign=:bottom)
+	# 	Legend(gl3[1, 0], group_marker, ["incorrectly \n predicted", "correctly \n predicted"], 
+	# 		framevisible=false, labelsize=14, halign=:left, valign=:bottom)
 
-		colors_3 = get(ColorSchemes.tab10, range(0.0, 1.0, length=3))
-		group_marker = [MarkerElement(marker = :circle, color = colors_3[i],
-			strokecolor = :transparent, markersize = 12) for i in 1:3]
+	# 	colors_3 = get(ColorSchemes.tab10, range(0.0, 1.0, length=3))
+	# 	group_marker = [MarkerElement(marker = :circle, color = colors_3[i],
+	# 		strokecolor = :transparent, markersize = 12) for i in 1:3]
 
-		Legend(gl3[2, 0], group_marker, ["LH", "EH", "CO"],
-			framevisible=false, labelsize=14, halign=:left, valign=:top)
+	# 	Legend(gl3[2, 0], group_marker, ["LH", "EH", "CO"],
+	# 		framevisible=false, labelsize=14, halign=:left, valign=:top)
 
-		axmain.xgridvisible = false
-		axmain.ygridvisible = false
-		axmain.zgridvisible = false
-	end
-	# colsize!(gl3, 1, Relative(0.05))
+	# 	axmain.xgridvisible = false
+	# 	axmain.ygridvisible = false
+	# 	axmain.zgridvisible = false
+	# end
+	# # colsize!(gl3, 1, Relative(0.05))
 	
-	# # Label(f[0, :], text = "", fontsize = 20)
-	# # # save("/Users/joe/Project/PhD/EuroFusion/EUROfusion_ML_2024/Presentations/Multidimensional_qunatity_classification_20_01_25/CO_EH_LH_classification.png", f)
-	# # display(GLMakie.Screen(), f)
-	f
+	# # # Label(f[0, :], text = "", fontsize = 20)
+	# # # # save("/Users/joe/Project/PhD/EuroFusion/EUROfusion_ML_2024/Presentations/Multidimensional_qunatity_classification_20_01_25/CO_EH_LH_classification.png", f)
+	# # # display(GLMakie.Screen(), f)
+	# f
 end
 
 # function evaluation_plot(data_::Dict{Symbol, Dict{String, classification_performance}})

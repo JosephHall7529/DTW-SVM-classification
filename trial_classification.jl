@@ -1,97 +1,99 @@
 # iterate over all trials: perform hyper-parameter search for set variables (add into the code manually)
-begin
-    initialize_trials = true
-    if initialize_trials
-        complete_CH_trial_1 = Dict()
-        complete_CH_trial_2 = Dict()
-        complete_CH_trial_3 = Dict()
-        complete_CH_trial_4 = Dict()
-        complete_CH_trial_5 = Dict()
-    end
-    for trial in [:trial_1]
-        labelled = (@subset trials_D @byrow $trial == 1)
-        unseen = (@subset trials_D @byrow $trial !== 1)
-        COchoices = (@subset labelled @byrow :label == "CO").shots
-        COn=size(COchoices, 1)
-        CEchoices = (@subset labelled @byrow :label == "EH").shots
-        CEn=size(CEchoices, 1)
-        CLchoices = (@subset labelled @byrow :label == "LH").shots
-        CLn=size(CLchoices, 1)
-        data_dict_old = let
-            labelled_shots = vcat(CLchoices, CEchoices, COchoices)
-            labels = vcat(repeat(["LH"], CLn),
-                repeat(["EH"], CEn),
-                repeat(["CO"], COn)
-            ) 
-            d = OrderedDict([ts for ts in labelled_shots] .=> labels)
-        end 
-        comp_CH = emp("complete_CH_trial_1")
+# begin
+#     initialize_trials = true
+#     if initialize_trials
+#         complete_CH_trial_1 = Dict()
+#         complete_CH_trial_2 = Dict()
+#         complete_CH_trial_3 = Dict()
+#         complete_CH_trial_4 = Dict()
+#         complete_CH_trial_5 = Dict()
+#     end
+#     for trial in [:trial_1]
+#         labelled = (@subset trials_D @byrow $trial == 1)
+#         unseen = (@subset trials_D @byrow $trial !== 1)
+#         COchoices = (@subset labelled @byrow :label == "CO").shots
+#         COn=size(COchoices, 1)
+#         CEchoices = (@subset labelled @byrow :label == "EH").shots
+#         CEn=size(CEchoices, 1)
+#         CLchoices = (@subset labelled @byrow :label == "LH").shots
+#         CLn=size(CLchoices, 1)
+#         data_dict_old = let
+#             labelled_shots = vcat(CLchoices, CEchoices, COchoices)
+#             labels = vcat(repeat(["LH"], CLn),
+#                 repeat(["EH"], CEn),
+#                 repeat(["CO"], COn)
+#             ) 
+#             d = OrderedDict([ts for ts in labelled_shots] .=> labels)
+#         end 
+#         comp_CH = emp("complete_CH_trial_1")
         
-        # ADD PARAMETERS HERE
-        # params = collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"], 1, 1))
-        # begin
-        #     if in(trial, [3])
-        #         params = [vcat(["NGW"], [para]) for para in ["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI"]]
-        #     elseif in(trial, [1, 2, 4, 5])
-        #         params = [vcat(["BETAPOL"], [para]) for para in ["IP", "PNBI", "PECRH", "PICRH", "Q95", "LI", "NGW"]]
-        #     end
-        # end
-        # begin
-        #     params = [vcat(["PNBI", "PICRH"], [para]) for para in ["IP", "PECRH", "Q95", "LI", "NGW"]]
-        # end
-        params = collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"], 1, 1))
-        for para in params
-            para = naming(para)
-            if haskey(data_dtw, para)
-                data_int = data_dtw[para]
-            else
-                println("data_dtw doesnt have ", para)
-                continue
-            end
-            if !isempty(comp_CH)
-                if in(para, collect(keys(comp_CH)))
-                    continue
-                end
-            end
-            println("\n", para)
-            k = [Int(div(CLn, 10/7)), Int(div(CEn, 10/7)), Int(div(COn, 10/7))]
-            println(k)
-            levels = ["LH", "EH", "CO"]
+#         # ADD PARAMETERS HERE
+#         # params = collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"], 1, 1))
+#         # begin
+#         #     if in(trial, [3])
+#         #         params = [vcat(["NGW"], [para]) for para in ["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI"]]
+#         #     elseif in(trial, [1, 2, 4, 5])
+#         #         params = [vcat(["BETAPOL"], [para]) for para in ["IP", "PNBI", "PECRH", "PICRH", "Q95", "LI", "NGW"]]
+#         #     end
+#         # end
+#         # begin
+#         #     params = [vcat(["PNBI", "PICRH"], [para]) for para in ["IP", "PECRH", "Q95", "LI", "NGW"]]
+#         # end
+#         params = collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"], 1, 1))
+#         for para in params
+#             para = naming(para)
+#             if haskey(data_dtw, para)
+#                 data_int = data_dtw[para]
+#             else
+#                 println("data_dtw doesnt have ", para)
+#                 continue
+#             end
+#             if !isempty(comp_CH)
+#                 if in(para, collect(keys(comp_CH)))
+#                     continue
+#                 end
+#             end
+#             println("\n", para)
+#             k = [Int(div(CLn, 10/7)), Int(div(CEn, 10/7)), Int(div(COn, 10/7))]
+#             println(k)
+#             levels = ["LH", "EH", "CO"]
             
-            comp_CH[para] = hyper_parameter_search(data_int, labelled_data, k, interesting="CO", N=60, metric="MulticlassFalsePositiveRate(;levels=$levels, perm=[1, 2, 3], checks=false)", max=false)
-        end
-    end
+#             comp_CH[para] = hyper_parameter_search(data_int, labelled_data, k, interesting="CO", N=60, metric="MulticlassFalsePositiveRate(;levels=$levels, perm=[1, 2, 3], checks=false)", max=false)
+#         end
+#     end
 
-    CH = complete_CH_trial_1[naming(["PNBI"])]
-    data_int = data_dtw[naming(["PNBI"])]
+#     CH = complete_CH_trial_1[naming(["PNBI"])]
+#     data_int = data_dtw[naming(["PNBI"])]
 
-    tss = tok_shots((@subset which(["PNBI"]) @byrow in(:tok, ["aug"])))
-    ℓT = length(tss)
-    dict_shot = Dict(1:ℓT .=> tss)
+#     tss = tok_shots((@subset which(["PNBI"]) @byrow in(:tok, ["aug"])))
+#     ℓT = length(tss)
+#     dict_shot = Dict(1:ℓT .=> tss)
 
-    begin
-        CLn, CEn, COn = trial_dataset_meta[:trial_1][2:4]
-                    tr_1 = (@subset trials_D @byrow :trial_1 == 1).shots
+#     begin
+#         CLn, CEn, COn = trial_dataset_meta[:trial_1][2:4]
+#                     tr_1 = (@subset trials_D @byrow :trial_1 == 1).shots
                 
-                    COchoices = sort(tr_1[1:COn])
-                    CEchoices = sort(tr_1[COn+1:COn+CEn])
-                    CLchoices = sort(tr_1[COn+CEn+1:end])
-        labelled_data = let
-            labelled_shots = vcat(CLchoices, CEchoices, COchoices)
-            labels = vcat(repeat(["C-LH"], length(CLchoices)),
-                repeat(["C-EH"], length(CEchoices)),
-                repeat(["CO"], length(COchoices))
-            ) 
-            d = OrderedDict([ts for ts in labelled_shots] .=> labels)
-        end 
-    end
-    begin
-        labelled_ts = collect(labelled_data |> keys)
-        labelled_y = collect(labelled_data |> values)
-        shot_dict = Dict([a => n for (n, a) in enumerate(data_int.tok_shots)])
-        labelled_ind = [shot_dict[k] for k in labelled_ts]
-    end
-end
+#                     COchoices = sort(tr_1[1:COn])
+#                     CEchoices = sort(tr_1[COn+1:COn+CEn])
+#                     CLchoices = sort(tr_1[COn+CEn+1:end])
+#         labelled_data = let
+#             labelled_shots = vcat(CLchoices, CEchoices, COchoices)
+#             labels = vcat(repeat(["C-LH"], length(CLchoices)),
+#                 repeat(["C-EH"], length(CEchoices)),
+#                 repeat(["CO"], length(COchoices))
+#             ) 
+#             d = OrderedDict([ts for ts in labelled_shots] .=> labels)
+#         end 
+#     end
+#     begin
+#         labelled_ts = collect(labelled_data |> keys)
+#         labelled_y = collect(labelled_data |> values)
+#         shot_dict = Dict([a => n for (n, a) in enumerate(data_int.tok_shots)])
+#         labelled_ind = [shot_dict[k] for k in labelled_ts]
+#     end
+# end
+
+
 struct classification_performance
     features::Vector{String}
     trial::Symbol
@@ -99,86 +101,87 @@ struct classification_performance
     train_results::DataFrame
     test_results::DataFrame
 end
+levels = ["LH", "EH", "CO"]
 
-# trial_one = Dict{Symbol, Dict{String, classification_performance}}()
-# for tr_name in [:trial_1, :trial_2, :trial_3, :trial_4, :trial_5]
-#     result_tmp = Dict()
-#     for para in collect(powerset(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"], 1, 1))
-#         if in(tr_name, keys(trial_one))
-#             println(true)
-#             if in(naming(para), keys(trial_one[tr_name]))
-#                 println(para)
-#                 continue
-#             end
-#         end
+trial_one = Dict{Symbol, Dict{String, classification_performance}}()
+for (tr_name, transport) in zip([:trial_1, :trial_2, :trial_3, :trial_4, :trial_5], [1.06, 1.44, 1.18, 1.38, 1.05])
+    result_tmp = Dict()
+    for para in collect(powerset(["IP", "PNBI", "BETAPOL", "Q95", "NGW"], 1, 1))
+        if in(tr_name, keys(trial_one))
+            println(true)
+            if in(naming(para), keys(trial_one[tr_name]))
+                println(para)
+                continue
+            end
+        end
 
-#         labelled = (@subset trials_D @byrow $tr_name == 1)
-#         unseen = (@subset trials_D @byrow $tr_name !== 1)
+        labelled = shuffle!((@subset trials_D @byrow $tr_name == 1))
+        unseen = shuffle!((@subset trials_D @byrow $tr_name !== 1))
 
-#         if in("NGW", para)
-#             rm_ind = findfirst(i -> i == ("aug", 29624), unseen.shots)
-#             deleteat!(unseen, rm_ind)
-#         end
+        if in("NGW", para)
+            rm_ind = findfirst(i -> i == ("aug", 29624), unseen.shots)
+            deleteat!(unseen, rm_ind)
+        end
 
-#         model_new = half_model(para, labelled.shots, labelled.label;
-#             target_shot_length=150,
-#             transportcost=1.2,
-#             short_IP=false)
-#         begin
-#             c0 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.05)
-#             c1 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.95)
-#             ft0 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.05)
-#             ft1 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.95)
+        model_new = half_model(para, labelled.shots, labelled.label;
+            target_shot_length=150,
+            transportcost=transport,
+            short_IP=false)
+        begin
+            c0 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.05)
+            c1 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.95)
+            ft0 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.05)
+            ft1 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.95)
 
-#             # r1 = range(model_tmp, :transportcost, lower=1, upper=1.5)
-#             # r2 = range(model_tmp, :target_shot_length, lower=100, upper=1000)
-#             r2 = range(model_new, :C_cosine, lower=c0, upper=c1)
-#             r3 = range(model_new, :C_flat_top, lower=ft0, upper=ft1)
-#             r4 = range(model_new, :C_cost, lower=0.5, upper=5) 
+            # r1 = range(model_new, :transportcost, lower=1, upper=1.5)
+            # r2 = range(model_tmp, :target_shot_length, lower=100, upper=1000)
+            r2 = range(model_new, :C_cosine, lower=c0, upper=c1)
+            r3 = range(model_new, :C_flat_top, lower=ft0, upper=ft1)
+            r4 = range(model_new, :C_cost, lower=0.5, upper=5) 
 
-#             # n_particles = 100_000 is a lot
-#             self_tuning_model = TunedModel(
-#                     model=model_new,
-#                     tuning=MLJParticleSwarmOptimization.AdaptiveParticleSwarm(n_particles=30),
-#                     # tuning=Grid(resolution=10),
-#                     resampling=StratifiedCV(nfolds=10, shuffle=true),
-#                     range=[r2, r3, r4],
-#                     measure=MulticlassFalsePositiveRate(levels=levels),
-#                     n=10,
-#                     acceleration=CPUThreads(),
-#                     check_measure=true
-#             )
+            # n_particles = 100_000 is a lot
+            self_tuning_model = TunedModel(
+                    model=model_new,
+                    tuning=MLJParticleSwarmOptimization.AdaptiveParticleSwarm(n_particles=100),
+                    # tuning=Grid(resolution=10),
+                    resampling=StratifiedCV(nfolds=10),
+                    range=[r2, r3, r4],
+                    measure=MulticlassFalsePositiveRate(levels=levels),
+                    n=10,
+                    acceleration=CPUThreads(),
+                    check_measure=true
+            )
 
-#             mach = machine(self_tuning_model, labelled.shots, labelled.label) 
-#             try 
-#                 MLJBase.fit!(mach, verbosity=1)
-#             catch
-#                 continue
-#             end
-#         end
-#         mach_save = deepcopy(mach)
-#         hyp_new = deepcopy(fitted_params(mach).best_model)
+            mach = machine(self_tuning_model, labelled.shots, labelled.label) 
+            try 
+                MLJBase.fit!(mach, verbosity=1)
+            catch
+                continue
+            end
+        end
+        mach_save = deepcopy(mach)
+        hyp_new = deepcopy(fitted_params(mach).best_model)
 
-#         train_result = evaluate(hyp_new, [MulticlassFalsePositiveRate(levels=levels), BalancedAccuracy(), Accuracy()])
-#         begin
-#             fitresult, cache, report = MLJBase.fit(hyp_new, 0, labelled.shots, labelled.label)
-#             ỹ = MLJBase.predict(hyp_new, fitresult, unseen.shots)
-#             mcFPR, BA, A = MulticlassFalsePositiveRate(levels=levels)(ỹ, unseen.label), BalancedAccuracy()(ỹ, unseen.label), Accuracy()(ỹ, unseen.label)
-#         end
+        train_result = evaluate(hyp_new, [MulticlassFalsePositiveRate(levels=levels), BalancedAccuracy(), Accuracy()])
+        begin
+            fitresult, cache, report = MLJBase.fit(hyp_new, 0, labelled.shots, labelled.label)
+            ỹ = MLJBase.predict(hyp_new, fitresult, unseen.shots)
+            mcFPR, BA, A = MulticlassFalsePositiveRate(levels=levels)(ỹ, unseen.label), BalancedAccuracy()(ỹ, unseen.label), Accuracy()(ỹ, unseen.label)
+        end
 
-#         test_result = DataFrame([mcFPR BA A], [:mcFPR, :BA, :ACC])
-#         result_tmp[naming(para)] = classification_performance(para, tr_name, hyp_new, train_result, test_result) 
-#     end
-#     # if !in(tr_name, keys(trial_one)) 
-#         trial_one[tr_name] = result_tmp
-#     # end
-# end
+        test_result = DataFrame([mcFPR BA A], [:mcFPR, :BA, :ACC])
+        result_tmp[naming(para)] = classification_performance(para, tr_name, hyp_new, train_result, test_result) 
+    end
+    if !in(tr_name, keys(trial_one)) 
+        trial_one[tr_name] = result_tmp
+    end
+end
 # begin
 #     f = Figure();
 #     a = Axis(f[1, 1], limits=(nothing, (0., 1.)))
 
 #     sorted_features = sort(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"])
-#     fig_D = trial_one[:trial_5]
+#     fig_D = trial_one[:trial_1]
     
 #     feat_dict = Dict(sort(sorted_features .=> 1:8))
 #     categories = Int[]
@@ -227,141 +230,148 @@ end
 #         end
 #     end
 # end
-# begin
-#     fin = DataFrame()
-#     for tr_name in [:trial_1, :trial_2, :trial_3, :trial_4, :trial_5]
-#         D = DataFrame()
-#         sorted_features = sort(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"])
-#         for (feat, class) in trial_one[tr_name]
-#             row = mean.(eachcol(class.train_results[:, 2:4]))
-#             labelled = (@subset trials_D @byrow $tr_name == 1)
-#             _,_,nSV = try MLJBase.fit(class.best_model, 0, labelled.shots, labelled.label) 
-#                 catch 
-#                     continue 
-#                 end
-#             nSV = reshape(nSV, 1, :)
-#             append!(D, DataFrame(hcat(tr_name, feat, reshape(row, 1, :), nSV), [:trial, :feat, :fpr, :bacc, :acc, :SVLH, :SVEH, :SVCO]))
-#         end
-#         D |> clipboard
-#         sort!(D, :fpr)
-#         append!(fin, D)
-#         # append!(fin, DataFrame(D[1, :]))
-#         # sort!(D, :bacc, rev=true)
-#         # append!(fin, DataFrame(D[1, :]))
-#     end
-# end
+begin
+    fin = DataFrame()
+    for tr_name in [:trial_1, :trial_2, :trial_3, :trial_4, :trial_5]
+        D = DataFrame()
+        sorted_features = sort(["PNBI"])
+        for (feat, class) in trial_one[tr_name]
+            row = mean.(eachcol(class.train_results[:, 2:4]))
+            labelled = (@subset trials_D @byrow $tr_name == 1)
+            _,_,nSV = try MLJBase.fit(class.best_model, 0, labelled.shots, labelled.label) 
+                catch 
+                    continue 
+                end
+            nSV = reshape(nSV, 1, :)
+            append!(D, DataFrame(hcat(tr_name, feat, reshape(row, 1, :), nSV), [:trial, :feat, :fpr, :bacc, :acc, :SVLH, :SVEH, :SVCO]))
+        end
+        D |> clipboard
+        sort!(D, :fpr)
+        append!(fin, D)
+        # append!(fin, DataFrame(D[1, :]))
+        # sort!(D, :bacc, rev=true)
+        # append!(fin, DataFrame(D[1, :]))
+    end
+end
+sort(fin, [:trial, :bacc], rev=[false, true]) |> vscodedisplay
 
-# trial_two = Dict{Symbol, Dict{String, classification_performance}}()
-# for tr_name in [:trial_1, :trial_2, :trial_3, :trial_4, :trial_5]
-#     result_tmp = Dict()
-#     for para in [["PNBI", i] for i in ["IP", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"]]
-#         npara = naming(para)
-#         if in(tr_name, keys(trial_two))
-#             println(true)
-#             if in(npara, keys(trial_two[tr_name]))
-#                 println(para)
-#                 continue
-#             end
-#         end
+trial_two = Dict{Symbol, Dict{String, classification_performance}}()
+for (tr_name, transport) in zip([:trial_1, :trial_2, :trial_3, :trial_4, :trial_5], [1.06, 1.44, 1.18, 1.38, 1.05])
+    result_tmp = Dict()
+    sorted_params = [["PNBI", i] for i in ["IP", "PECRH", "PICRH", "Q95", "BETAPOL", "LI", "NGW"]]
 
-#         labelled = (@subset trials_D @byrow $tr_name == 1)
-#         unseen = (@subset trials_D @byrow $tr_name !== 1)
+    for para in sorted_params
+        npara = naming(para)
+        if in(tr_name, keys(trial_two))
+            println(true)
+            if in(npara, keys(trial_two[tr_name]))
+                println(para)
+                continue
+            end
+        end
 
-#         if in("NGW", para)
-#             rm_ind = findfirst(i -> i == ("aug", 29624), unseen.shots)
-#             deleteat!(unseen, rm_ind)
-#         end
+        labelled = shuffle((@subset trials_D @byrow $tr_name == 1))
+        unseen = shuffle((@subset trials_D @byrow $tr_name !== 1))
 
-#         model_new = half_model(para, labelled.shots, labelled.label;
-#             target_shot_length=150,
-#             transportcost=1.2,
-#             short_IP=false)
-#         begin
-#             c0 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.05)
-#             c1 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.95)
-#             ft0 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.05)
-#             ft1 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.95)
+        if in("NGW", para)
+            rm_ind = findfirst(i -> i == ("aug", 29624), unseen.shots)
+            deleteat!(unseen, rm_ind)
+        end
 
-#             # r1 = range(model_tmp, :transportcost, lower=1, upper=1.5)
-#             # r2 = range(model_tmp, :target_shot_length, lower=100, upper=1000)
-#             r2 = range(model_new, :C_cosine, lower=c0, upper=c1)
-#             r3 = range(model_new, :C_flat_top, lower=ft0, upper=ft1)
-#             r4 = range(model_new, :C_cost, lower=0.5, upper=5) 
+        model_new = half_model(para, labelled.shots, labelled.label;
+            target_shot_length=150,
+            transportcost=transport,
+            short_IP=false)
+        begin
+            c0 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.05)
+            c1 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.95)
+            ft0 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.05)
+            ft1 = quantile(Array(model_new.database.training_data.flat_top_cost[:, 2:end])[:], 0.95)
 
-#             # n_particles = 100_000 is a lot
-#             self_tuning_model = TunedModel(
-#                     model=model_new,
-#                     tuning=MLJParticleSwarmOptimization.AdaptiveParticleSwarm(n_particles=30),
-#                     # tuning=Grid(resolution=10),
-#                     resampling=StratifiedCV(nfolds=10, shuffle=true),
-#                     range=[r2, r3, r4],
-#                     measure=MulticlassFalsePositiveRate(levels=levels),
-#                     n=10,
-#                     acceleration=CPUThreads(),
-#                     check_measure=true
-#             )
+            r1 = range(model_new, :transportcost, lower=1, upper=1.5)
+            # r2 = range(model_tmp, :target_shot_length, lower=100, upper=1000)
+            r2 = range(model_new, :C_cosine, lower=c0, upper=c1)
+            r3 = range(model_new, :C_flat_top, lower=ft0, upper=ft1)
+            r4 = range(model_new, :C_cost, lower=0.5, upper=5) 
 
-#             mach = machine(self_tuning_model, labelled.shots, labelled.label) 
-#             try 
-#                 MLJBase.fit!(mach, verbosity=1)
-#             catch
-#                 continue
-#             end
-#         end
-#         mach_save = deepcopy(mach)
-#         hyp_new = deepcopy(fitted_params(mach).best_model)
+            # n_particles = 100_000 is a lot
+            self_tuning_model = TunedModel(
+                    model=model_new,
+                    tuning=MLJParticleSwarmOptimization.AdaptiveParticleSwarm(n_particles=100),
+                    # tuning=Grid(resolution=10),
+                    resampling=StratifiedCV(nfolds=10),
+                    range=[r1, r2, r3, r4],
+                    measure=MulticlassFalsePositiveRate(levels=levels),
+                    n=10,
+                    acceleration=CPUThreads(),
+                    check_measure=true
+            )
 
-#         train_result = evaluate(hyp_new, [MulticlassFalsePositiveRate(levels=levels), BalancedAccuracy(), Accuracy()])
-#         begin
-#             fitresult, cache, report = MLJBase.fit(hyp_new, 0, labelled.shots, labelled.label)
-#             ỹ = MLJBase.predict(hyp_new, fitresult, unseen.shots)
-#             mcFPR, BA, A = MulticlassFalsePositiveRate(levels=levels)(ỹ, unseen.label), BalancedAccuracy()(ỹ, unseen.label), Accuracy()(ỹ, unseen.label)
-#         end
+            mach = machine(self_tuning_model, labelled.shots, labelled.label) 
+            try 
+                MLJBase.fit!(mach, verbosity=1)
+            catch
+                continue
+            end
+        end
+        mach_save = deepcopy(mach)
+        hyp_new = deepcopy(fitted_params(mach).best_model)
 
-#         test_result = DataFrame([mcFPR BA A], [:mcFPR, :BA, :ACC])
-#         result_tmp[npara] = classification_performance(para, tr_name, hyp_new, train_result, test_result) 
-#     end
-#     if !in(tr_name, keys(trial_two)) 
-#         trial_two[tr_name] = result_tmp
-#     end
-# end
+        train_result = evaluate(hyp_new, [MulticlassFalsePositiveRate(levels=levels), BalancedAccuracy(), Accuracy()])
+        begin
+            fitresult, cache, report = MLJBase.fit(hyp_new, 0, labelled.shots, labelled.label)
+            ỹ = MLJBase.predict(hyp_new, fitresult, unseen.shots)
+            mcFPR, BA, A = MulticlassFalsePositiveRate(levels=levels)(ỹ, unseen.label), BalancedAccuracy()(ỹ, unseen.label), Accuracy()(ỹ, unseen.label)
+        end
+
+        test_result = DataFrame([mcFPR BA A], [:mcFPR, :BA, :ACC])
+        result_tmp[npara] = classification_performance(para, tr_name, hyp_new, train_result, test_result) 
+    end
+    if !in(tr_name, keys(trial_two)) 
+        trial_two[tr_name] = result_tmp
+    end
+end
 # begin
 #     f = Figure();
 #     a = Axis(f[1, 1], limits=(nothing, (0., 1.)))
-
-#     sorted_features = sort(naming.([["PNBI", i] for i in ["IP", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"]]))
-#     fig_D = trial_two[:trial_3]
     
+#     tr_name = :trial_1
+#     fig_D = trial_two[tr_name]
+    
+#     sorted_features = [["PNBI", i] for i in ["IP", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"]]
+
 #     feat_dict = Dict(sort(sorted_features .=> 1:7))
 #     categories = Int[]
 #     valuez = Float64[]
 #     dodge = Int[]
 #     for feat in sorted_features
-#         name_feat = naming([feat])
+#         name_feat = naming(feat)
 #         if !haskey(fig_D, name_feat)
 #             continue
 #         end
 #         ℓ = size(fig_D[name_feat].train_results, 1)
 
-#         append!(categories, feat_dict[name_feat].*ones(Int, ℓ))
+#         append!(categories, feat_dict[feat].*ones(Int, ℓ))
 #         append!(valuez, fig_D[name_feat].train_results[:, 3])
-#         append!(dodge, feat_dict[name_feat].*ones(Int, ℓ))
+#         append!(dodge, feat_dict[feat].*ones(Int, ℓ))
 #     end
 #     categories
 
 #     boxplot!(a, categories, valuez, colormap=colors[1:8], color=dodge, outliercolor=:black, markersize=8, whiskerwidth=0.2, width=0.7)
 #     # a.xticks = (range(1, 9, length=8), sort(["IP", "PNBI", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"]))
-#     a.xticks=(1:7, sorted_features)
+#     a.xticks=(1:7, naming.(sorted_features))
 #     a.yticks = 0:0.1:1
 #     a.xticklabelrotation = -π/6
 #     #     # boxplot!(a, D.train_results[:, 3], label=feat, color=colors_15[n], scale_to=-0.6, offset=n, direction=:x)
 #     # end
 #     # f[1, 2] = Legend(f, a, "features", framevisible=false)
 #     display(GLMakie.Screen(), f)
+#     # f
 # end
 # begin
 #     for tr_name in [:trial_1, :trial_2, :trial_3, :trial_4, :trial_5]
-#         for para in [["PNBI", i] for i in ["IP", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"]]
+#         sorted_params = [["PNBI", i] for i in ["IP", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"]]
+#         for para in sorted_params
 #             npara = naming(para)
 #             if !haskey(trial_two[tr_name], npara)
 #                 continue
@@ -379,29 +389,31 @@ end
 #         end
 #     end
 # end
-# begin
-#     fin = DataFrame()
-#     for tr_name in [:trial_1, :trial_2, :trial_3, :trial_4, :trial_5]
-#         D = DataFrame()
-#         sorted_features = sort(naming.([["PNBI", i] for i in ["IP", "PECRH", "PICRH", "BETAPOL", "Q95", "LI", "NGW"]]))
-#         for (feat, class) in trial_two[tr_name]
-#             row = mean.(eachcol(class.train_results[:, 2:4]))
-#             labelled = (@subset trials_D @byrow $tr_name == 1)
-#             _,_,nSV = try MLJBase.fit(class.best_model, 0, labelled.shots, labelled.label) 
-#                 catch 
-#                     continue 
-#                 end
-#             nSV = reshape(nSV, 1, :)
-#             append!(D, DataFrame(hcat(tr_name, feat, reshape(row, 1, :), nSV), [:trial, :feat, :fpr, :bacc, :acc, :SVLH, :SVEH, :SVCO]))
-#         end
-#         D |> clipboard
-#         sort!(D, :fpr)
-#         append!(fin, D)
-#         # append!(fin, DataFrame(D[1, :]))
-#         # sort!(D, :bacc, rev=true)
-#         # append!(fin, DataFrame(D[1, :]))
-#     end
-# end
+begin
+    fin = DataFrame()
+    for tr_name in [:trial_1, :trial_2, :trial_3, :trial_4, :trial_5]
+        D = DataFrame()
+        
+        for (feat, class) in trial_two[tr_name]
+            μ = mean.(eachcol(class.train_results[:, 2:4]))
+            σ = std.(eachcol(class.train_results[:, 2:4]))
+            labelled = (@subset trials_D @byrow $tr_name == 1)
+            _,_,nSV = try MLJBase.fit(class.best_model, 0, labelled.shots, labelled.label) 
+                catch 
+                    continue 
+                end
+            nSV = reshape(nSV, 1, :)
+            append!(D, DataFrame(hcat(tr_name, feat, reshape(μ, 1, :), nSV), [:trial, :feat, :fpr, :bacc, :acc, :SVLH, :SVEH, :SVCO]))
+        end
+        D |> clipboard
+        sort!(D, :fpr)
+        append!(fin, D)
+        # append!(fin, DataFrame(D[1, :]))
+        # sort!(D, :bacc, rev=true)
+        # append!(fin, DataFrame(D[1, :]))
+    end
+end
+sort(fin, [:trial, :bacc], rev=[false, true]) |> vscodedisplay
 
 # trial_three = Dict{Symbol, Dict{String, classification_performance}}()
 # for tr_name in [:trial_1, :trial_2, :trial_4, :trial_5]
@@ -571,20 +583,23 @@ end
 
 begin
     final_trial_classifiers = Dict()
+    levels = ["LH", "EH", "CO"]
     for (tr_name, paras) in zip([:trial_1, :trial_2, :trial_3, :trial_4, :trial_5],
-                                    [["PNBI", "NGW"], ["PNBI", "NGW"], ["PNBI"], ["PNBI", "NGW"], ["PNBI", "BETAPOL", "PECRH"]]
+                                    [["PNBI"], ["PNBI"], ["PNBI"], ["PNBI"], ["PNBI"]]
         )
-        dir = joinpath("/Users/joe/Project/Coding_clean/J_Hybrid_plasma_classification_25_02_24/metadata/trial_case/", naming(["PNBI", "NGW"]), "$(tr_name)", "SVM.jlso")
-        mach = JLSO.load(dir)[:machine]
+        dir = joinpath("/Users/joe/Project/Coding_clean/J_Hybrid_plasma_classification_25_02_24/metadata/trial_case/", naming(paras), "$(tr_name)", "SVM.jlso")
+        mach = deepcopy(JLSO.load(dir)[:machine])
         restore!(mach)
 
         labelled = (@subset trials_D @byrow $tr_name == 1)
         unseen = (@subset trials_D @byrow $tr_name !== 1) 
 
-        if in("NGW", para)
-            rm_ind = findfirst(i -> i == ("aug", 29624), unseen.shots)
-            deleteat!(unseen, rm_ind)
-        end
+        println(tr_name, " ", paras)
+        # if in("NGW", paras)
+        #     rm_ind = findfirst(i -> i == ("aug", 29624), unseen.shots)
+        #     deleteat!(unseen, rm_ind)
+        # end
+
         train_result = evaluate(mach.model, [MulticlassFalsePositiveRate(levels=levels), BalancedAccuracy(), Accuracy()])
         begin
             fitresult, cache, report = MLJBase.fit(mach.model, 0, labelled.shots, labelled.label)
@@ -596,11 +611,36 @@ begin
         final_trial_classifiers[tr_name] = classification_performance(paras, tr_name, mach.model, train_result, test_result)
     end
 end
-final_trial_classifiers[:trial_1].best_model
+final_trial_classifiers[:trial_5].test_results
 
+# Determine train case used for classification
+let 
+	begin 
+        tr_name = :trial_1
+        paras = ["IP", "PNBI"]
+        npara = naming(paras)
+        labelled = (@subset trials_D @byrow $tr_name == 1)
+        unseen = (@subset trials_D @byrow $tr_name !== 1) 
+    end	
+	begin
+		HYP = final_trial_classifiers
 
+		data = DataFrame(HYP.kernel, ["$(ts)" for ts in HYP.results.ts])
+		insertcols!(data, 1, :train => collect(keys(labelled_data)))
 
+		ind = findfirst(i -> i == "(\"aug\", $(shot))", names(data))
+		CL_train, CE_train, CO_train = data[1:CLn, ind], data[CLn+1:CLn+CEn, ind], data[CLn+CEn+1:end, ind]
+		CL_dict = sort(Dict(CL_train .=> 1:CLn), byvalue=false, rev=true)
+		CE_dict = sort(Dict(CE_train .=> 1:CEn), byvalue=false, rev=true)
+		CO_dict = sort(Dict(CO_train .=> 1:COn), byvalue=false, rev=true)
 
+		CL_ind = collect(values(CL_dict))[1:best]
+		CE_ind = collect(values(CE_dict))[1:best] 
+		CO_ind = collect(values(CO_dict))[1:best] 	
+
+		data[vcat(CL_ind, CLn.+CE_ind, (CLn+CEn).+CO_ind), vcat(1, ind)]
+	end
+end
 
 begin
     para = ["PNBI"]
@@ -650,20 +690,25 @@ end
 train_result = evaluate(fitted_params(mach).best_model, [MulticlassFalsePositiveRate(levels=levels), BalancedAccuracy(), Accuracy()])
 hist(train_result[!, 3])
 
-let 
+final_trial_classifiers[:trial_1].best_model.database.testing_data
+begin
     # f = Figure();
     # a = Axis(f[1, 1])
+    # tr_name = :trial_1
+
+    labelled = (@subset trials_D @byrow $tr_name == 1)
+    unseen = (@subset trials_D @byrow $tr_name !== 1)  
 
     tr_1, te_1 = partition(labelled, 0.7; stratify=labelled.label)
-    model = 
-    svmmodel = mach.fitresult.fitresult
+
+    model = final_trial_classifiers[tr_name].best_model
+    svmmodel, cache, report = MLJBase.fit(model, 0, labelled.shots, labelled.label)
     # # overview_fit(model, svmmodel, unseen_1.shots, unseen_1.label)
     overview_fit(model, svmmodel, tr_1.shots, tr_1.label)
     # signal_1 = 
     # mat = dtw_cost_matrix(signal_2, signal_1, Cityblock())
 	# cost, i1, i2 = DynamicAxisWarping.trackback(mat)
 end
-
 
 fitted_params(mach).best_model
 # using known hyp-fit-values
@@ -1575,80 +1620,7 @@ let
 end
 complete_CH_trial_1_["IP_PNBI"].results
 
-# Determine train case used for classification
-let 
-	begin 
-        trial = 4
-        para = naming(["IP", "PNBI"])
-        begin
-            if trial == 1
-                CLn, CEn, COn = trial_dataset_meta[:trial_1][2:4]
-                tr_1 = (@subset trials_D @byrow :trial_1 == 1).shots
 
-                COchoices = sort(tr_1[1:COn])
-                CEchoices = sort(tr_1[COn+1:COn+CEn])
-                CLchoices = sort(tr_1[COn+CEn+1:end])
-            elseif trial == 2
-                CLn, CEn, COn = trial_dataset_meta[:trial_2][2:4]
-                tr_2 = (@subset trials_D @byrow :trial_2 == 1).shots
-
-                COchoices = sort(tr_2[1:COn])
-                CEchoices = sort(tr_2[COn+1:COn+CEn])
-                CLchoices = sort(tr_2[COn+CEn+1:end])
-            elseif trial == 3
-                CLn, CEn, COn = trial_dataset_meta[:trial_3][2:4]
-                tr_3 = (@subset trials_D @byrow :trial_3 == 1).shots
-
-                COchoices = sort(tr_3[1:COn])
-                CEchoices = sort(tr_3[COn+1:COn+CEn])
-                CLchoices = sort(tr_3[COn+CEn+1:end])
-            elseif trial == 4
-                CLn, CEn, COn = trial_dataset_meta[:trial_4][2:4]
-                tr_4 = (@subset trials_D @byrow :trial_4 == 1).shots
-
-                COchoices = sort(tr_4[1:COn])
-                CEchoices = sort(tr_4[COn+1:COn+CEn])
-                CLchoices = sort(tr_4[COn+CEn+1:end])
-            elseif trial == 5
-                CLn, CEn, COn = trial_dataset_meta[:trial_5][2:4]
-                tr_5 = (@subset trials_D @byrow :trial_5 == 1).shots
-
-                COchoices = sort(tr_5[1:COn])
-                CEchoices = sort(tr_5[COn+1:COn+CEn])
-                CLchoices = sort(tr_5[COn+CEn+1:end])
-            end
-            labelled_data = let
-                labelled_shots = vcat(CLchoices, CEchoices, COchoices)
-                labels = vcat(repeat(["C-LH"], length(CLchoices)),
-                    repeat(["C-EH"], length(CEchoices)),
-                    repeat(["CO"], length(COchoices))
-                ) 
-                d = OrderedDict([ts for ts in labelled_shots] .=> labels)
-            end
-        end
-        comp_CH = emp("complete_CH_trial_$(trial)_")
-        shot = 39126
-        best = 4
-    end	
-	begin
-		HYP = comp_CH[para]
-
-		data = DataFrame(HYP.kernel, ["$(ts)" for ts in HYP.results.ts])
-		insertcols!(data, 1, :train => collect(keys(labelled_data)))
-
-		ind = findfirst(i -> i == "(\"aug\", $(shot))", names(data))
-		CL_train, CE_train, CO_train = data[1:CLn, ind], data[CLn+1:CLn+CEn, ind], data[CLn+CEn+1:end, ind]
-		CL_dict = sort(Dict(CL_train .=> 1:CLn), byvalue=false, rev=true)
-		CE_dict = sort(Dict(CE_train .=> 1:CEn), byvalue=false, rev=true)
-		CO_dict = sort(Dict(CO_train .=> 1:COn), byvalue=false, rev=true)
-
-		CL_ind = collect(values(CL_dict))[1:best]
-		CE_ind = collect(values(CE_dict))[1:best] 
-		CO_ind = collect(values(CO_dict))[1:best] 	
-
-		data[vcat(CL_ind, CLn.+CE_ind, (CLn+CEn).+CO_ind), vcat(1, ind)]
-	end
-end
 
 # See the closeness
 let

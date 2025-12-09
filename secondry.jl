@@ -335,25 +335,29 @@ end
 function flat_top_NBI(tok_shots::Vector{Tuple{String, Int64}}, percentage::Float64=0.8) 
     dict = Dict{Tuple, Tuple}()
     for ts in tok_shots
-        P = profiles(ts..., "PNBI")
-        P.y.y .= movavg(P.y.y, 300).x
-        P = profiles(ts..., "IP")
-        P.y.y .= movavg(P.y.y, 300).x
-        if in(ts[2], [8121, 11175, 13885, 15632, 15634, 15653, 22832])
-            dict[ts] = (1.6, 3.5)
-            continue
-        elseif in(ts[2], [11207, 11208, 13173, 15614, 15617, 15619, 16685, 17283, 17284, 17295, 18884, 34454])
-            dict[ts] = (2.2, 5.2)
-            continue
-        elseif in(ts[2], [37082, 40851])
-            dict[ts] = (2.2, 3.5)
-        end
-        if in(ts, [7691])
-            dict[ts] = time_interval_top_down_NBI(ts, "PNBI", 0.9; divisions=3)
-        else
-            dict[ts] = time_interval_top_down_NBI(ts, "PNBI", percentage; divisions=3)
+        for feat in ["IP", "PNBI", "PECRH", "PICRH", "Q95", "BETAPOL", "LI", "NGW"]
+            try 
+                P = profiles(ts..., feat)
+                P.y.y .= movavg(P.y.y, 150).x
+            catch
+                continue
+            end
         end
         
+        # if in(ts[2], [8121, 11175, 13885, 15632, 15634, 15653, 22832])
+        #     dict[ts] = (1.6, 3.5)
+        #     continue
+        # elseif in(ts[2], [11207, 11208, 13173, 15614, 15617, 15619, 16685, 17283, 17284, 17295, 18884, 34454])
+        #     dict[ts] = (2.2, 5.2)
+        #     continue
+        # elseif in(ts[2], [37082, 40851])
+        #     dict[ts] = (2.2, 3.5)
+        # end
+        # if in(ts, [7691])
+        #     dict[ts] = time_interval_top_down_NBI(ts, "PNBI", 0.9; divisions=3)
+        # else
+        dict[ts] = time_interval_top_down_NBI(ts, "PNBI", percentage; divisions=3)
+        # end
     end
 
     return dict

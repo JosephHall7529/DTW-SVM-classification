@@ -132,42 +132,53 @@ train, test = partition(labelled, 0.6; rng=12, stratify=labelled.label)
 
 # new
 # make optimisation structure fill database with profile/flattop data and create cosine/flattop cost
-# model_new = DTW_SVM(["IP"]; target_shot_length=100, transportcost=1.1)
-# fill_dtw_data!(model_new.database, 100)
-# model_fill_train!(model_new, train.shots, train.label)
-# model_fill_test!(model_new, test.shots)
+model_new = DTW_SVM(["BETAPOL"]; target_shot_length=150, transportcost=1.23, 
+            C_cosine = 0.0086,
+            C_flat_top = 1.685,
+            C_cost = 3.22)
+fill_dtw_data!(model_new.database, 150)
 
+labelled = (@subset trials_D @byrow :trial_1 == 1)
+unseen = (@subset trials_D @byrow :trial_1 !== 1)[[1, 131, 40, 407], :]
+tr_1, te_1 = partition(labelled, 0.7; stratify=labelled.label)
+
+model_fill_train!(model_new, labelled.shots, labelled.label)
+model_fill_test!(model_new, labelled.shots)
 # fit and predict
+# final_trial_classifiers[:trial_1].best_model
 begin
-    CC = 0.003
-    FTC = 1.4
+    CC = 0.0086
+    FTC = 1.685
+    C = 3.22
+    transportcost = 1.23
 
     train_fast = model_new.database.training_data
-    tr_shots = train.shots
+    tr_shots = train_fast.metadata.shots
     train_names = df_ts_naming(tr_shots)
-    ind = sortperm(train_fast.metadata, :order)
-    X = exp.(-(Array(train_fast.cosine_cost[ind, train_names]) ./ CC).^2) .*
-        exp.(-(Array(train_fast.flat_top_cost[ind, train_names]) ./ FTC).^2)
+
+    X = exp.(-(Array(train_fast.cosine_cost[:, train_names]) ./ CC).^2) .*
+        exp.(-(Array(train_fast.flat_top_cost[:, train_names]) ./ FTC).^2)
 
     K_new = X
-    model = svmtrain(K_new, train.label, kernel=Kernel.Precomputed, cost=1.0)
+    model = svmtrain(K_new, train_fast.metadata.label, kernel=Kernel.Precomputed, cost=C)
 
-    te_shots = test.shots
+    te_shots = labelled.shots
     test_names = df_ts_naming(te_shots)
-    ind = sortperm(model_new.database.training_data.metadata, :order)
 
-    X = exp.(-(Array(model_new.database.testing_data.cosine_cost[ind, test_names]) ./ CC).^2) .*
-        exp.(-(Array(model_new.database.testing_data.flat_top_cost[ind, test_names]) ./ FTC).^2)
+    X = exp.(-(Array(model_new.database.testing_data.cosine_cost[:, test_names]) ./ CC).^2) .*
+        exp.(-(Array(model_new.database.testing_data.flat_top_cost[:, test_names]) ./ FTC).^2)
     
     KK_new = X
 
     ỹ_new, _ = svmpredict(model, KK_new)
-    DataFrame(:pred_new => ỹ_new, :pred_old => ỹ_old, :actual => test.label)
+    # DataFrame(:pred_new => ỹ_new, :pred_old => ỹ_old, :actual => test.label)
 end
 
 # testing 
-model_new = half_model(["IP", "PNBI"], labelled.shots, labelled.label;
-    target_shot_length=150)
+model_new = half_model(["BETAPOL"], labelled.shots, labelled.label;
+    target_shot_length=150, transportcost=1.23)
+
+
 begin
     c0 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.05)
     c1 = quantile(Array(model_new.database.training_data.cosine_cost[:, 2:end])[:], 0.95)
@@ -201,8 +212,8 @@ hyp_new = deepcopy(fitted_params(mach).best_model)
 
 eva = evaluate(hyp_new, [MulticlassFalsePositiveRate(levels=levels), BalancedAccuracy(), Accuracy()])
 
-fitresult, cache, report = MLJBase.fit(hyp_new, 0, labelled.shots, labelled.label)
-ỹ = MLJBase.predict(hyp_new, fitresult, unseen.shots)
+fitresult, cache, report = MLJBase.fit(model_new, 0, labelled.shots, labelled.label)
+ỹ = MLJBase.predict(model_new, fitresult, unseen.shots)
 mcFPR, BA, A = MulticlassFalsePositiveRate(levels=levels)(ỹ, unseen.label), BalancedAccuracy()(ỹ, unseen.label), Accuracy()(ỹ, unseen.label)
 
 f = Figure();

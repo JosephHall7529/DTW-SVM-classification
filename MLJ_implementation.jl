@@ -160,6 +160,7 @@ function fill_dtw_data!(data_::DTW_data, target_length::Int)
     return data_
 end
 
+# meta-data and cost matrices are organised the same (i.e ordered)
 function model_fill_train!(model_::DTW_SVM, X, y)
     ℓT = length(X) #cost matrices are equal height and width of size ℓT
     indices = [model_.database.shot_ind_dict[ts] for ts in X]
@@ -169,11 +170,15 @@ function model_fill_train!(model_::DTW_SVM, X, y)
     flat_top_cost = zeros(ℓT, ℓT)
     
     # find indices of training data, initialise a dataframe with the metadata for training
+    
+    # training metadata orders the input data as given in the function (sub optimal for viewing)
     metadata = DataFrame(:order => 1:ℓT, :ind => indices, :shots => X, :label => y)
+    # Hence we sort the training data according to their label and shotnumber
     sort!(metadata, [:label, :shots], rev=[true, false])
 
     path_cos_ℓ = zeros(ℓT, ℓT)
     path_ft_ℓ = zeros(ℓT, ℓT)
+    # The cosine/flat-top cost arrays are organised according to the post sort
     for (i, train_ts_i) in ProgressBar(enumerate(metadata.shots))
         for (j, train_ts_j) in enumerate(metadata.shots)
             data_j = model_.database.profile_data[train_ts_j]
@@ -206,6 +211,8 @@ function model_fill_train!(model_::DTW_SVM, X, y)
     model_.database.training_data = DTW_train_result(metadata, cosine_cost, flat_top_cost)
     return model_.database
 end
+
+# training (ith dim) in sorted order, testing in order of function input
 function model_fill_test!(model_::DTW_SVM, X)
     training = model_.database.training_data
     ℓtr = size(training.metadata, 1)
@@ -216,11 +223,14 @@ function model_fill_test!(model_::DTW_SVM, X)
     cosine_cost = zeros(ℓtr, ℓT)
     flat_top_cost = zeros(ℓtr, ℓT)
     
-    # find indices of training data, initialise a dataframe with the metadata for training 
+    # find indices of training data, initialise a dataframe with the metadata for training
+    # ordered according to input
     metadata = DataFrame(:order => 1:ℓT, :ind => indices, :shots => X)
 
     path_cos_ℓ = zeros(ℓtr, ℓT) 
     path_ft_ℓ = zeros(ℓtr, ℓT) 
+
+    # training (ith dim) in sorted order, testing in order of function input
     for (i, train_ts) in ProgressBar(enumerate(training.metadata.shots))
         for (j, test_ts) in enumerate(metadata.shots)
             data_j = model_.database.profile_data[test_ts]
@@ -260,19 +270,20 @@ function MLJBase.fit(model_::DTW_SVM, verbosity::Int, X, y)
     if model_.database.target_shot_length !== model_.target_shot_length
         fill_dtw_data!(model_.database, model_.target_shot_length)
     end
+    # pre-sorted
     model_fill_train!(model_, X, y)
+    fast_train = model_.database.training_data.metadata
 
-    # organise the train kernel
-    train_names = df_ts_naming(X)
-    ind = sortperm(model_.database.training_data.metadata, :order)
-    Xmatrix = (ftX = Array(model_.database.training_data.flat_top_cost[ind, train_names]),
-                cosX = Array(model_.database.training_data.cosine_cost[ind, train_names]))
+    train_names = df_ts_naming(fast_train.shots)
+    Xmatrix = (ftX = Array(model_.database.training_data.flat_top_cost[:, train_names]),
+                cosX = Array(model_.database.training_data.cosine_cost[:, train_names]))
 
     K = exp.(-(Xmatrix.cosX ./ (model_.C_cosine)).^2) .*
         exp.(-(Xmatrix.ftX ./ (model_.C_flat_top)).^2)
 
     X = MLJBase.matrix(K)
-    fitresult = svmtrain(X, y, kernel=Kernel.Precomputed, cost=model_.C_cost)
+    # When fitting: train is ordered 
+    fitresult = svmtrain(X, fast_train.label, kernel=Kernel.Precomputed, cost=model_.C_cost)
 
     report = dtw_svm_report(fitresult)
     # report = nothing
@@ -285,14 +296,13 @@ function MLJBase.predict(model_::DTW_SVM, fitresult, Xnew)
     if model_.database.target_shot_length !== model_.target_shot_length
         fill_dtw_data!(model_.database, model_.target_shot_length)
     end
+    # organised such that train is sorted, while test as given in function
     model_fill_test!(model_, Xnew)
     test_data = model_.database.testing_data
 
     test_names = df_ts_naming(Xnew)
-    ind = sortperm(model_.database.training_data.metadata, :order)
-
-    Xmatrix = (ftX = Array(test_data.flat_top_cost[ind, test_names]), 
-                cosX = Array(test_data.cosine_cost[ind, test_names]))
+    Xmatrix = (ftX = Array(test_data.flat_top_cost[:, test_names]), 
+                cosX = Array(test_data.cosine_cost[:, test_names]))
 
     # println(size(Xmatrix.ftX))
     K = exp.(-(Xmatrix.cosX ./ (model_.C_cosine)).^2) .* 
@@ -300,9 +310,10 @@ function MLJBase.predict(model_::DTW_SVM, fitresult, Xnew)
 
     X = MLJBase.matrix(K)
     ỹ, confidence = svmpredict(fitresult, X)
-    test_data.metadata.y = ỹ
+    test_data.metadata.y = deepcopy(ỹ)
     test_data.metadata.confidence = [confidence[:, i] for i in 1:length(Xnew)]
-
+    
+    # now we can sort it according to the predictions and shot numbers
     sort!(test_data.metadata, [:y, :shots], rev=[true, false])
 
     return ỹ
@@ -364,10 +375,6 @@ function C_extremes(model_::DTW_SVM)
     return results
 end
 
-y=[1,1,1]
-ỹ = [2,1,3]
-map([BalancedAccuracy(), Accuracy])
-
 import MLJBase.evaluate
 function evaluate(model_::DTW_SVM, measures; N::Int=1000)
     Results = DataFrame()
@@ -375,17 +382,15 @@ function evaluate(model_::DTW_SVM, measures; N::Int=1000)
     model_train = deepcopy(model_.database.training_data)
     ℓ_data = size(model_train.metadata, 1)
 
-    K = exp.(-(Array(model_train.cosine_cost[:, 2:end]) ./ (hyp_new.C_cosine)).^2) .* 
-                exp.(-(Array(model_train.flat_top_cost[:, 2:end]) ./ (hyp_new.C_flat_top)).^2)
+    K = exp.(-(Array(model_train.cosine_cost[:, 2:end]) ./ (model_.C_cosine)).^2) .* 
+                exp.(-(Array(model_train.flat_top_cost[:, 2:end]) ./ (model_.C_flat_top)).^2)
     for S in 0:N
         begin
             train_ind, test_ind = partition(1:ℓ_data, 0.7, rng=S, stratify=model_train.metadata.label)
-            sort!(train_ind)
-            sort!(test_ind)
 
-            model = svmtrain(K[train_ind, train_ind], model_train.metadata.label[train_ind], kernel=Kernel.Precomputed, cost=hyp_new.C_cost)
+            svm_model = svmtrain(K[train_ind, train_ind], model_train.metadata.label[train_ind], kernel=Kernel.Precomputed, cost=model_.C_cost)
 
-            ỹ, _ = svmpredict(model, K[train_ind, test_ind])
+            ỹ, _ = svmpredict(svm_model, K[train_ind, test_ind])
             y = model_train.metadata.label[test_ind]
 
             y_preds = map(measures) do m
@@ -394,7 +399,7 @@ function evaluate(model_::DTW_SVM, measures; N::Int=1000)
 
             # println("accuracy = $(acc), balanced accuracy = $(b_acc), false positive rate = $(fpr)")
 
-            SVL, SVE, SVO = model.SVs.nSV
+            SVL, SVE, SVO = svm_model.SVs.nSV
             # println(SVL, ", $(SVE), $(SVO)")
             cnt_map = countmap(ỹ)
             no_CO = haskey(cnt_map, "CO") ? cnt_map["CO"] : 0
