@@ -281,6 +281,13 @@ function MLJBase.fit(model_::DTW_SVM, verbosity::Int, X, y)
     K = exp.(-(Xmatrix.cosX ./ (model_.C_cosine)).^2) .*
         exp.(-(Xmatrix.ftX ./ (model_.C_flat_top)).^2)
 
+    if !issymmetric(K)
+        digits = 10
+        while digits > 2 && !issymmetric(K)
+            K = round.(K, digits=digits)
+            digits -= 1
+        end
+    end
     X = MLJBase.matrix(K)
     # When fitting: train is ordered 
     fitresult = svmtrain(X, fast_train.label, kernel=Kernel.Precomputed, cost=model_.C_cost)
