@@ -335,12 +335,16 @@ end
 function flat_top_NBI(tok_shots::Vector{Tuple{String, Int64}}, percentage::Float64=0.8) 
     dict = Dict{Tuple, Tuple}()
     for ts in tok_shots
-        for feat in ["IP", "PNBI", "PECRH", "PICRH", "Q95", "BETAPOL", "LI", "NGW"]
-            try 
-                P = profiles(ts..., feat)
-                P.y.y .= movavg(P.y.y, 150).x
-            catch
-                continue
+        if mvavg
+            P = profiles(ts..., "IP")
+            ℓ = findlast(i -> i > 0, (0.05 .- P.t))
+            for feat in ["IP", "PNBI", "PECRH", "PICRH", "Q95", "BETAPOL", "LI", "NGW"]
+                try 
+                    P = profiles(ts..., feat)
+                    P.y.y .= movavg(P.y.y, ℓ).x
+                catch
+                    continue
+                end
             end
         end
         
